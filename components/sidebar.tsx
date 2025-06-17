@@ -14,15 +14,28 @@ import {
   Users,
   Barcode
 } from "lucide-react"
-import { useUser } from "@/lib/UserContext" // 👈 CONTEXT ici
+import { useUser } from "@/lib/UserContext"
 import Image from "next/image"
+import { useEffect, useState } from "react"
 
 export default function Sidebar() {
   const pathname = usePathname()
-  const { userRole } = useUser() // 👈 on récupère le rôle
+  const { userRole } = useUser()
   const role = userRole?.toLowerCase()
-
   const isAdmin = role === "admin"
+
+  const [recetteNette, setRecetteNette] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (isAdmin) {
+      fetch("/recettes/api")
+        .then(res => res.json())
+        .then(data => {
+          const nette = (data.ventes || 0) - (data.retraits || 0)
+          setRecetteNette(nette)
+        })
+    }
+  }, [isAdmin])
 
   const routes = [
     {
@@ -44,14 +57,14 @@ export default function Sidebar() {
       icon: Users,
       href: "/clients",
       color: "text-pink-700",
-      show: isAdmin,
+      show: true,
     },
     {
       label: "Ventes (POS)",
       icon: ShoppingCart,
       href: "/pos",
       color: "text-orange-500",
-      show: true, // toujours visible
+      show: true,
     },
     {
       label: "Factures",
@@ -88,6 +101,20 @@ export default function Sidebar() {
       color: "text-purple-600",
       show: isAdmin,
     },
+    {
+      label: recetteNette !== null ? `Recette du mois: ${recetteNette} DT` : "Recette du mois",
+      icon: CircleDollarSign,
+      href: "/recettes",
+      color: "text-yellow-600",
+      show: isAdmin,
+    },
+    {
+      label: "Retraits d'argent",
+      icon: FileText,
+      href: "/retraits",
+      color: "text-red-600",
+      show: isAdmin,
+    },
   ]
 
   const filteredRoutes = routes.filter((route) => route.show)
@@ -95,18 +122,17 @@ export default function Sidebar() {
   return (
     <div className="hidden border-r bg-background md:block md:w-64">
       <div className="flex h-full flex-col">
-<div className="border-b px-4 py-4">
-  <Link href="/" className="block relative w-full h-32">
-    <Image
-      src="/armella.png" // ← Assure-toi que ce fichier est dans le dossier public
-      alt="Logo Armelia"
-      fill
-      style={{ objectFit: "contain" }}
-      priority
-    />
-  </Link>
-</div>
-
+        <div className="border-b px-4 py-4">
+          <Link href="/" className="block relative w-full h-32">
+            <Image
+              src="/armella.png"
+              alt="Logo Armelia"
+              fill
+              style={{ objectFit: "contain" }}
+              priority
+            />
+          </Link>
+        </div>
 
         <div className="flex-1 overflow-auto py-2">
           <nav className="grid items-start px-2 text-sm font-medium">
@@ -120,7 +146,7 @@ export default function Sidebar() {
                 )}
               >
                 <route.icon className={cn("h-5 w-5", route.color)} />
-                {route.label}
+                <span className="truncate">{route.label}</span>
               </Link>
             ))}
           </nav>
