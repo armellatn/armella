@@ -3,7 +3,7 @@ import db from '@/lib/db'
 
 export async function GET() {
   try {
-    const retraits = await db.query(`
+    const result = await db.query(`
       SELECT id, montant, description, date
       FROM retraits
       WHERE EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM CURRENT_DATE)
@@ -11,10 +11,10 @@ export async function GET() {
       ORDER BY date DESC
     `)
 
-    return NextResponse.json(retraits.rows)
-  } catch (error) {
-    console.error('❌ Erreur API retraits GET :', error)
-    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
+    return NextResponse.json(Array.isArray(result.rows) ? result.rows : [])
+  } catch (error: any) {
+    console.error('❌ Erreur API retraits GET :', error.message)
+    return NextResponse.json({ error: 'Erreur serveur: ' + error.message }, { status: 500 })
   }
 }
 
@@ -31,8 +31,7 @@ export async function POST(req: Request) {
       [montant, description]
     )
 
-    // Retourner les retraits mis à jour
-    const updated = await db.query(`
+    const result = await db.query(`
       SELECT id, montant, description, date
       FROM retraits
       WHERE EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM CURRENT_DATE)
@@ -40,9 +39,9 @@ export async function POST(req: Request) {
       ORDER BY date DESC
     `)
 
-    return NextResponse.json(updated.rows)
-  } catch (error) {
-    console.error('❌ Erreur API retraits POST :', error)
-    return NextResponse.json({ error: 'Erreur serveur' }, { status: 500 })
+    return NextResponse.json(result.rows)
+  } catch (error: any) {
+    console.error('❌ Erreur API retraits POST :', error.message)
+    return NextResponse.json({ error: 'Erreur serveur: ' + error.message }, { status: 500 })
   }
 }
