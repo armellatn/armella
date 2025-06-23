@@ -103,10 +103,12 @@ stock_quantite: product?.stock_quantite?.toString() || "1",
 
     if (match) {
       const [, , duree, pStr] = match
-      const puissance   = pStr ? Math.abs(parseFloat(pStr)) : 0
+      const puissance = pStr ? parseFloat(pStr).toString() : "0"
+
       const isCorrection= !!pStr
 
-      form.setValue("puissance", isCorrection ? puissance.toString() : "0")
+      form.setValue("puissance", isCorrection ? puissance : "0")
+
       form.setValue("duree_port", duree)
       form.setValue("prix_achat", "0")
 
