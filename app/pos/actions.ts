@@ -13,6 +13,7 @@ export type Product = {
   stock_quantite: number
   puissance: string
   diametre: string
+  duree_port: string
 }
 
 export type Client = {

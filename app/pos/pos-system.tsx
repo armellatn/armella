@@ -1,8 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 
-// Importations UI individuellement
+// ---------------------------------------------------------------------
+//  UI  (importés individuellement pour tree-shaking)
+// ---------------------------------------------------------------------
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -26,9 +28,10 @@ import { DialogHeader } from "@/components/ui/dialog"
 import { DialogTitle } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { useRef } from "react"
 
-// Icônes
+// ---------------------------------------------------------------------
+//  Icônes
+// ---------------------------------------------------------------------
 import {
   Search,
   Plus,
@@ -40,22 +43,48 @@ import {
   Filter,
 } from "lucide-react"
 
-// Types & actions
-import { type CartItem, type Client, type Product, createSale } from "./actions"
+// ---------------------------------------------------------------------
+//  Types & actions
+// ---------------------------------------------------------------------
+import {
+  type CartItem,
+  type Client,
+  type Product,
+  createSale,
+} from "./actions"
 
-
+// ---------------------------------------------------------------------
+//  Props du composant
+// ---------------------------------------------------------------------
 interface POSSystemProps {
   products: Product[]
   clients: Client[]
   categories: { id: number; nom: string }[]
+  marques: string[]
+  puissances: string[]
+  durees: string[]
 }
 
-export default function POSSystem({ products, clients, categories }: POSSystemProps) {
-  /* ---------------------------------------------------------------- */
-  /*                             STATES                               */
-  /* ---------------------------------------------------------------- */
+// ---------------------------------------------------------------------
+//  Composant principal
+// ---------------------------------------------------------------------
+export default function POSSystem({
+  products,
+  clients,
+  categories,
+  marques,
+  puissances,
+  durees,
+}: POSSystemProps) {
+  /* ------------------------------------------------------------------ */
+  /*                               STATES                                */
+  /* ------------------------------------------------------------------ */
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
+  const [selectedMarque, setSelectedMarque] = useState("all")
+  const [selectedPuissance, setSelectedPuissance] = useState("all")
+  const [selectedDureePort, setSelectedDureePort] = useState("all")
+
   const [cart, setCart] = useState<CartItem[]>([])
   const [selectedClient, setSelectedClient] = useState<number | null>(null)
   const [discount, setDiscount] = useState(0)
@@ -68,13 +97,13 @@ export default function POSSystem({ products, clients, categories }: POSSystemPr
   const [isProcessing, setIsProcessing] = useState(false)
   const [showFilters, setShowFilters] = useState(false)
 
-  // 🔍 États pour le scan douchette
-  const [barcode, setBarcode] = useState("")
+  // 🔍 États pour le scanner douchette
   const [scanTimeout, setScanTimeout] = useState<NodeJS.Timeout | null>(null)
+  const barcodeRef = useRef("")
 
-  /* ---------------------------------------------------------------- */
-  /*                     FONCTIONS PANIER / PRODUITS                  */
-  /* ---------------------------------------------------------------- */
+  /* ------------------------------------------------------------------ */
+  /*                       PANIER / PRODUITS                             */
+  /* ------------------------------------------------------------------ */
   const formatPrice = (price: any) =>
     (isNaN(+price) ? 0 : +price).toFixed(2)
 
@@ -92,9 +121,13 @@ export default function POSSystem({ products, clients, categories }: POSSystemPr
       setCart(
         cart.map(i =>
           i.product.id === product.id
-            ? { ...i, quantity: i.quantity + 1, total: (i.quantity + 1) * +i.price }
-            : i,
-        ),
+            ? {
+                ...i,
+                quantity: i.quantity + 1,
+                total: (i.quantity + 1) * +i.price,
+              }
+            : i
+        )
       )
     } else {
       const price = parseFloat(product.prix_vente?.toString() || "0")
@@ -127,8 +160,8 @@ export default function POSSystem({ products, clients, categories }: POSSystemPr
       cart.map(i =>
         i.id === id
           ? { ...i, quantity: qty, total: +(qty * +i.price).toFixed(2) }
-          : i,
-      ),
+          : i
+      )
     )
   }
 
@@ -141,45 +174,69 @@ export default function POSSystem({ products, clients, categories }: POSSystemPr
     setDiscount(0)
     setNotes("")
   }
-const barcodeRef = useRef("")
 
-  /* ---------------------------------------------------------------- */
-  /*                ECOUTE CLAVIER POUR LECTEUR CODE-BARRES           */
-  /* ---------------------------------------------------------------- */
-useEffect(() => {
-  const handleKeyDown = (e: KeyboardEvent) => {
-    if (scanTimeout) clearTimeout(scanTimeout)
+  /* ------------------------------------------------------------------ */
+  /*                ÉCOUTE CLAVIER POUR LE LECTEUR CODE-BARRES          */
+  /* ------------------------------------------------------------------ */
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (scanTimeout) clearTimeout(scanTimeout)
+      if (e.key.length > 1 && e.key !== "Enter") return
 
-    // Ignorer les touches non imprimables (ex: Shift, Alt, Control, etc.)
-    if (e.key.length > 1 && e.key !== "Enter") return
-
-    if (e.key === "Enter") {
-      const code = barcodeRef.current.trim()
-      if (code) {
-        console.log("Scanned:", code)
-        handleScan(code)
+      if (e.key === "Enter") {
+        const code = barcodeRef.current.trim()
+        if (code) handleScan(code)
+        barcodeRef.current = ""
+        return
       }
-      barcodeRef.current = ""
-      return
+
+      barcodeRef.current += e.key
+      const timeout = setTimeout(() => {
+        barcodeRef.current = ""
+      }, 300)
+      setScanTimeout(timeout)
     }
 
-    barcodeRef.current += e.key
+    window.addEventListener("keydown", handleKeyDown)
+    return () => window.removeEventListener("keydown", handleKeyDown)
+  }, [scanTimeout])
 
-    const timeout = setTimeout(() => {
-      barcodeRef.current = ""
-    }, 300)
+  /* ------------------------------------------------------------------ */
+  /*                    FILTRE PRODUITS (inclut NOUVEAUX filtres)       */
+  /* ------------------------------------------------------------------ */
+  const filteredProducts = products.filter(p => {
+    const q = searchTerm.toLowerCase()
 
-    setScanTimeout(timeout)
-  }
+    const matchesSearch =
+      p.nom.toLowerCase().includes(q) ||
+      p.marque?.toLowerCase().includes(q) ||
+      p.code_produit.toLowerCase().includes(q)
 
-  window.addEventListener("keydown", handleKeyDown)
-  return () => window.removeEventListener("keydown", handleKeyDown)
-}, [scanTimeout])
+    const matchesCategory =
+      selectedCategory === "all" ||
+      p.categorie_id?.toString() === selectedCategory
 
+    const matchesMarque =
+      selectedMarque === "all" || p.marque === selectedMarque
 
-  /* ---------------------------------------------------------------- */
-  /*                       PAIEMENT & FACTURE                         */
-  /* ---------------------------------------------------------------- */
+    const matchesPuissance =
+      selectedPuissance === "all" || p.puissance === selectedPuissance
+
+    const matchesDuree =
+      selectedDureePort === "all" || p.duree_port === selectedDureePort
+
+    return (
+      matchesSearch &&
+      matchesCategory &&
+      matchesMarque &&
+      matchesPuissance &&
+      matchesDuree
+    )
+  })
+
+  /* ------------------------------------------------------------------ */
+  /*                       PAIEMENT & FACTURE                           */
+  /* ------------------------------------------------------------------ */
   const handleCheckout = () => {
     if (cart.length === 0) {
       alert("Le panier est vide")
@@ -197,7 +254,7 @@ useEffect(() => {
         total,
         discount,
         paymentMethod,
-        notes,
+        notes
       )
       if (res.success) {
         setLastTotal(total)
@@ -219,12 +276,14 @@ useEffect(() => {
   const printReceipt = () => {
     const printWindow = window.open("", "_blank")
     if (!printWindow) {
-      alert("Veuillez autoriser les popups pour imprimer le reçu")
+      alert("Veuillez autoriser les pop-ups pour imprimer le reçu")
       return
     }
 
     const client = clients.find(c => c.id === selectedClient)
-    const clientName = client ? `${client.nom} ${client.prenom}` : "Client occasionnel"
+    const clientName = client
+      ? `${client.nom} ${client.prenom}`
+      : "Client occasionnel"
 
     printWindow.document.write(`
       <html>
@@ -266,7 +325,7 @@ useEffect(() => {
                     <td>${formatPrice(i.price)} TND</td>
                     <td>${i.quantity}</td>
                     <td>${formatPrice(i.total)} TND</td>
-                  </tr>`,
+                  </tr>`
               )
               .join("")}
             <tr><td colspan="3" class="total-row">Sous-total</td><td class="total-row">${formatPrice(subtotal)} TND</td></tr>
@@ -293,26 +352,14 @@ useEffect(() => {
     }
   }
 
-  /* ---------------------------------------------------------------- */
-  /*                         RENDU UI (JSX)                           */
-  /* ---------------------------------------------------------------- */
-
-  const filteredProducts = products.filter(p => {
-    const q = searchTerm.toLowerCase()
-    const matchesSearch =
-      p.nom.toLowerCase().includes(q) ||
-      p.marque.toLowerCase().includes(q) ||
-      p.code_produit.toLowerCase().includes(q)
-    const matchesCategory =
-      selectedCategory === "all" || p.categorie_id?.toString() === selectedCategory
-    return matchesSearch && matchesCategory
-  })
-
+  /* ------------------------------------------------------------------ */
+  /*                            RENDU UI                                */
+  /* ------------------------------------------------------------------ */
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-      {/* ------------------------------------------------------------------ */}
-      {/*                               PRODUITS                              */}
-      {/* ------------------------------------------------------------------ */}
+      {/* ---------------------------------------------------------------- */}
+      {/*                              PRODUITS                            */}
+      {/* ---------------------------------------------------------------- */}
       <div className="lg:col-span-2">
         {/* Barre de recherche */}
         <div className="mb-4 flex flex-col gap-2">
@@ -334,35 +381,107 @@ useEffect(() => {
             </Button>
           </div>
 
+          {/* Bloc filtres */}
           {showFilters && (
-            <div className="flex items-center gap-2 p-2 bg-muted/50 rounded-md">
-              <Label htmlFor="category-filter">Catégorie :</Label>
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger id="category-filter" className="flex-1">
-                  <SelectValue placeholder="Toutes les catégories" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Toutes les catégories</SelectItem>
-                  {categories.map(c => (
-                    <SelectItem key={c.id} value={c.id.toString()}>
-                      {c.nom}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <div className="flex flex-wrap gap-4 p-2 bg-muted/50 rounded-md">
+              {/* Catégorie */}
+              <div className="flex-1 min-w-[170px]">
+                <Label>Catégorie</Label>
+                <Select
+                  value={selectedCategory}
+                  onValueChange={setSelectedCategory}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Toutes" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Toutes les catégories</SelectItem>
+                    {categories.map(c => (
+                      <SelectItem key={c.id} value={c.id.toString()}>
+                        {c.nom}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Marque */}
+              <div className="flex-1 min-w-[150px]">
+                <Label>Marque</Label>
+                <Select
+                  value={selectedMarque}
+                  onValueChange={setSelectedMarque}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Toutes" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Toutes les marques</SelectItem>
+                    {marques.map(m => (
+                      <SelectItem key={m} value={m}>
+                        {m}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Puissance */}
+              <div className="flex-1 min-w-[150px]">
+                <Label>Puissance</Label>
+                <Select
+                  value={selectedPuissance}
+                  onValueChange={setSelectedPuissance}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Toutes" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Toutes les puissances</SelectItem>
+                    {puissances.map(p => (
+                      <SelectItem key={p} value={p}>
+                        {p}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Durée de port */}
+              <div className="flex-1 min-w-[150px]">
+                <Label>Durée</Label>
+                <Select
+                  value={selectedDureePort}
+                  onValueChange={setSelectedDureePort}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Toutes" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Toutes les durées</SelectItem>
+                    {durees.map(d => (
+                      <SelectItem key={d} value={d}>
+                        {d}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
           )}
         </div>
 
         {/* Grille produits */}
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4">
           {filteredProducts.length === 0 ? (
             <div className="col-span-full flex h-32 items-center justify-center text-muted-foreground">
               Aucun produit trouvé.
             </div>
           ) : (
             filteredProducts.map(p => {
-              const cat = categories.find(c => c.id === Number(p.categorie_id))
+              const cat = categories.find(
+                c => c.id === Number(p.categorie_id)
+              )
               return (
                 <Button
                   key={p.id}
@@ -371,16 +490,20 @@ useEffect(() => {
                   onClick={() => addToCart(p)}
                 >
                   <div className="font-medium">{p.nom}</div>
-                  <div className="text-sm text-muted-foreground">{p.marque}</div>
+                  <div className="text-sm text-muted-foreground">
+                    {p.marque}
+                  </div>
                   {cat && (
                     <Badge variant="outline" className="mt-1 text-xs">
                       {cat.nom}
                     </Badge>
                   )}
                   <div className="mt-2 flex w-full justify-between">
-                    <span className="text-sm">{formatPrice(p.prix_vente)} TND</span>
+                    <span className="text-sm">
+                      {formatPrice(p.prix_vente)} TND
+                    </span>
                     <span className="text-xs text-muted-foreground">
-                      Stock : {p.stock_quantite}
+                      Stock&nbsp;: {p.stock_quantite}
                     </span>
                   </div>
                 </Button>
@@ -390,14 +513,16 @@ useEffect(() => {
         </div>
       </div>
 
-      {/* ------------------------------------------------------------------ */}
-      {/*                                PANIER                              */}
-      {/* ------------------------------------------------------------------ */}
+      {/* ---------------------------------------------------------------- */}
+      {/*                               PANIER                             */}
+      {/* ---------------------------------------------------------------- */}
       <div className="flex flex-col rounded-lg border bg-card shadow-sm">
         {/* En-tête panier */}
         <div className="p-4 space-y-1.5">
           <h3 className="text-lg font-semibold">Panier</h3>
-          <p className="text-sm text-muted-foreground">{cart.length} article(s)</p>
+          <p className="text-sm text-muted-foreground">
+            {cart.length} article(s)
+          </p>
         </div>
         <Separator />
 
@@ -443,7 +568,9 @@ useEffect(() => {
                   <TableRow key={i.id}>
                     <TableCell>
                       <div className="font-medium">{i.product.nom}</div>
-                      <div className="text-xs text-muted-foreground">{i.product.marque}</div>
+                      <div className="text-xs text-muted-foreground">
+                        {i.product.marque}
+                      </div>
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end">
@@ -451,7 +578,9 @@ useEffect(() => {
                           variant="outline"
                           size="icon"
                           className="h-6 w-6"
-                          onClick={() => updateQuantity(i.id, i.quantity - 1)}
+                          onClick={() =>
+                            updateQuantity(i.id, i.quantity - 1)
+                          }
                         >
                           <Minus className="h-3 w-3" />
                         </Button>
@@ -460,7 +589,9 @@ useEffect(() => {
                           variant="outline"
                           size="icon"
                           className="h-6 w-6"
-                          onClick={() => updateQuantity(i.id, i.quantity + 1)}
+                          onClick={() =>
+                            updateQuantity(i.id, i.quantity + 1)
+                          }
                         >
                           <Plus className="h-3 w-3" />
                         </Button>
@@ -501,7 +632,9 @@ useEffect(() => {
               min="0"
               step="0.01"
               value={discount}
-              onChange={e => setDiscount(parseFloat(e.target.value) || 0)}
+              onChange={e =>
+                setDiscount(parseFloat(e.target.value) || 0)
+              }
               className="h-8 w-24"
             />
             <span>TND</span>
@@ -518,21 +651,27 @@ useEffect(() => {
           <Button variant="outline" onClick={clearCart}>
             Annuler
           </Button>
-          <Button onClick={handleCheckout} disabled={cart.length === 0}>
+          <Button
+            onClick={handleCheckout}
+            disabled={cart.length === 0}
+          >
             Paiement
           </Button>
         </div>
       </div>
 
-      {/* ------------------------------------------------------------------ */}
-      {/*                       DIALOGUE DE PAIEMENT                         */}
-      {/* ------------------------------------------------------------------ */}
-      <Dialog open={showPaymentDialog} onOpenChange={setShowPaymentDialog}>
+      {/* ---------------------------------------------------------------- */}
+      {/*                    DIALOGUE DE PAIEMENT                           */}
+      {/* ---------------------------------------------------------------- */}
+      <Dialog
+        open={showPaymentDialog}
+        onOpenChange={setShowPaymentDialog}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Finaliser la vente</DialogTitle>
             <DialogDescription>
-              Choisissez le mode de paiement et ajoutez des notes si nécessaire.
+              Choisissez le mode de paiement et ajoutez des notes.
             </DialogDescription>
           </DialogHeader>
 
@@ -540,7 +679,10 @@ useEffect(() => {
             {/* Mode de paiement */}
             <div className="grid gap-2">
               <Label htmlFor="payment-method">Mode de paiement</Label>
-              <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+              <Select
+                value={paymentMethod}
+                onValueChange={setPaymentMethod}
+              >
                 <SelectTrigger id="payment-method">
                   <SelectValue placeholder="Sélectionner" />
                 </SelectTrigger>
@@ -582,7 +724,10 @@ useEffect(() => {
           </div>
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => setShowPaymentDialog(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setShowPaymentDialog(false)}
+            >
               Annuler
             </Button>
             <Button onClick={handlePayment} disabled={isProcessing}>
@@ -593,17 +738,22 @@ useEffect(() => {
         </DialogContent>
       </Dialog>
 
-      {/* ------------------------------------------------------------------ */}
-      {/*                     DIALOGUE DE SUCCÈS VENTE                        */}
-      {/* ------------------------------------------------------------------ */}
-      <Dialog open={showSuccessDialog} onOpenChange={setShowSuccessDialog}>
+      {/* ---------------------------------------------------------------- */}
+      {/*                  DIALOGUE SUCCÈS VENTE                            */}
+      {/* ---------------------------------------------------------------- */}
+      <Dialog
+        open={showSuccessDialog}
+        onOpenChange={setShowSuccessDialog}
+      >
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center text-green-600">
               <Check className="mr-2 h-5 w-5" />
               Vente réussie
             </DialogTitle>
-            <DialogDescription>La vente a bien été enregistrée.</DialogDescription>
+            <DialogDescription>
+              La vente a bien été enregistrée.
+            </DialogDescription>
           </DialogHeader>
 
           <div className="py-4">
@@ -611,7 +761,8 @@ useEffect(() => {
               Facture N° : <strong>{invoiceNumber}</strong>
             </p>
             <p className="mb-4">
-              Montant total : <strong>{formatPrice(lastTotal)} TND</strong>
+              Montant total :{" "}
+              <strong>{formatPrice(lastTotal)} TND</strong>
             </p>
 
             <Button onClick={printReceipt} className="w-full mb-2">

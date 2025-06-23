@@ -164,20 +164,33 @@ export async function getTopSellingProducts() {
   }
 }
 export async function getStockStats() {
-  const { rows } = await db.query(`
-    SELECT 
-      COUNT(*) AS total_produits,
-      SUM(stock_quantite) AS total_quantite,
-      SUM(stock_quantite * prix_achat) AS valeur_totale_stock
-    FROM produits
-  `)
+  try {
+    const { rows } = await db.query(`
+      SELECT 
+        COUNT(*) AS total_produits,
+        SUM(COALESCE(stock_quantite, 0)) AS total_quantite,
+        SUM(COALESCE(stock_quantite, 0) * COALESCE(prix_vente, 0)) AS valeur_totale_stock
+      FROM produits
+    `)
 
-  return {
-    totalProduits: Number(rows[0].total_produits),
-    totalQuantite: Number(rows[0].total_quantite),
-    valeurTotaleStock: Number(rows[0].valeur_totale_stock),
+    const row = rows[0]
+
+    return {
+      totalProduits: Number(row.total_produits) || 0,
+      totalQuantite: Number(row.total_quantite) || 0,
+      valeurTotaleStock: Number(row.valeur_totale_stock) || 0,
+    }
+  } catch (error) {
+    console.error("Erreur lors du calcul des statistiques de stock :", error)
+    return {
+      totalProduits: 0,
+      totalQuantite: 0,
+      valeurTotaleStock: 0,
+    }
   }
 }
+
+
 export async function getTopStockedProducts() {
   const { rows } = await db.query(`
     SELECT nom, stock_quantite

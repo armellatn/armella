@@ -12,7 +12,8 @@ import {
   ShoppingCart,
   Truck,
   Users,
-  Barcode
+  Barcode,
+  RefreshCcw
 } from "lucide-react"
 import { useUser } from "@/lib/UserContext"
 import Image from "next/image"
@@ -114,6 +115,13 @@ export default function Sidebar() {
       href: "/retraits",
       color: "text-red-600",
       show: isAdmin,
+    },
+        {
+      label: "Échanges",
+      icon: RefreshCcw,
+      href: "/echanges",
+      color: "text-indigo-600",
+      show: true, 
     },
   ]
 

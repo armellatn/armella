@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useRef } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -16,6 +16,7 @@ interface Product {
   code_produit: string
   nom: string
   marque: string
+  stock_quantite: number
 }
 
 interface BarcodeGeneratorProps {
@@ -24,13 +25,18 @@ interface BarcodeGeneratorProps {
 
 export default function BarcodeGenerator({ products }: BarcodeGeneratorProps) {
   const [selectedProduct, setSelectedProduct] = useState<string>("")
-  const [quantity, setQuantity] = useState<number>(1)
   const [barcodeSize, setBarcodeSize] = useState<string>("medium")
   const [layout, setLayout] = useState<string>("2x5")
+  const [searchTerm, setSearchTerm] = useState("")
 
   const getProduct = (id: string) => {
     return products.find((product) => product.id.toString() === id)
   }
+
+  const filteredProducts = products.filter((p) =>
+    p.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    p.code_produit.toLowerCase().includes(searchTerm.toLowerCase())
+  )
 
   const generateBarcodes = () => {
     if (!selectedProduct) return []
@@ -38,16 +44,15 @@ export default function BarcodeGenerator({ products }: BarcodeGeneratorProps) {
     const product = getProduct(selectedProduct)
     if (!product) return []
 
-    return Array.from({ length: quantity }, (_, index) => ({
-      id: index,
+    return [{
+      id: product.id,
       code: product.code_produit,
       name: product.nom,
       brand: product.marque,
-    }))
+    }]
   }
 
   const barcodes = generateBarcodes()
-
   const [cols] = layout.split("x").map(Number)
 
   const getSizeClass = () => {
@@ -61,59 +66,45 @@ export default function BarcodeGenerator({ products }: BarcodeGeneratorProps) {
     }
   }
 
-const printAsPDF = () => {
-  const product = getProduct(selectedProduct)
-  if (!product) {
-    alert("Aucun produit sélectionné.")
-    return
+  const printAsPDF = () => {
+    const product = getProduct(selectedProduct)
+    if (!product) {
+      alert("Aucun produit sélectionné.")
+      return
+    }
+
+    const pdf = new jsPDF({
+      orientation: "landscape",
+      unit: "mm",
+      format: [70, 35],
+    })
+
+    const canvas = document.createElement("canvas")
+    canvas.width = 800
+    canvas.height = 200
+    const ctx = canvas.getContext("2d")
+    ctx!.scale(4, 4)
+
+    JsBarcode(canvas, product.code_produit, {
+      format: "CODE128",
+      displayValue: true,
+      font: "monospace",
+      fontSize: 14,
+      width: 2.5,
+      height: 40,
+      margin: 6,
+    })
+
+    const imgData = canvas.toDataURL("image/png")
+    pdf.setFontSize(10)
+    pdf.text(product.nom, 35, 10, { align: "center" })
+    const barcodeWidth = 60
+    const barcodeX = (70 - barcodeWidth) / 2
+    pdf.addImage(imgData, "PNG", barcodeX, 12, barcodeWidth, 20)
+
+    pdf.autoPrint()
+    window.open(pdf.output("bloburl"), "_blank")
   }
-
-  const pdf = new jsPDF({
-    orientation: "landscape",
-    unit: "mm",
-    format: [70, 35], // dimensions physiques de ton étiquette
-  })
-
-  const canvas = document.createElement("canvas")
-  canvas.width = 800
-  canvas.height = 200
-
-  const ctx = canvas.getContext("2d")
-  ctx!.scale(4, 4) // haute résolution pour éviter les pointillés
-
-JsBarcode(canvas, product.code_produit, {
-  format: "CODE128",
-  displayValue: true,     // important pour voir le texte
-  font: "monospace",      // plus lisible
-  fontSize: 14,
-  width: 2.5,             // barres plus épaisses
-  height: 40,             // meilleure lecture
-  margin: 6,              // petit espace autour
-})
-
-
-  const imgData = canvas.toDataURL("image/png")
-
-  // Centrer le nom du produit
-  pdf.setFontSize(10)
-  pdf.text(product.nom, 35, 10, { align: "center" })
-
-  // Centrer dynamiquement le code-barres
-  const barcodeWidth = 60
-  const barcodeX = (70 - barcodeWidth) / 2 // centré horizontalement
-
-  pdf.addImage(imgData, "PNG", barcodeX, 12, barcodeWidth, 20)
-
-  pdf.autoPrint()
-  window.open(pdf.output("bloburl"), "_blank")
-}
-
-
-
-
-
-
-
 
   return (
     <div className="space-y-6">
@@ -125,26 +116,25 @@ JsBarcode(canvas, product.code_produit, {
               <SelectValue placeholder="Sélectionner un produit" />
             </SelectTrigger>
             <SelectContent>
-              {products.map((product) => (
+              <div className="p-2">
+                <Input
+                  placeholder="Rechercher un produit..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+              {filteredProducts.map((product) => (
                 <SelectItem key={product.id} value={product.id.toString()}>
                   {product.nom} ({product.code_produit})
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="quantity">Quantité</Label>
-          <Input
-            id="quantity"
-            type="number"
-            min="1"
-            max="100"
-            value={quantity}
-            onChange={(e) => setQuantity(Number.parseInt(e.target.value) || 1)}
-            className="h-12"
-          />
+          {selectedProduct && (
+            <p className="text-sm text-muted-foreground mt-2">
+              Quantité en stock : {getProduct(selectedProduct)?.stock_quantite  ?? "N/A"}
+            </p>
+          )}
         </div>
 
         <div className="space-y-2">
@@ -181,7 +171,7 @@ JsBarcode(canvas, product.code_produit, {
           variant="outline"
           onClick={() => {
             setSelectedProduct("")
-            setQuantity(1)
+            setSearchTerm("")
           }}
           className="h-12"
           disabled={!selectedProduct}
