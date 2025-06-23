@@ -61,7 +61,7 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
     description:   product?.description  || "",
     prix_achat:    product?.prix_achat?.toString() || "",
     prix_vente:    product?.prix_vente?.toString() || "",
-    stock_quantite:product?.stock_quantite?.toString() || "",
+stock_quantite: product?.stock_quantite?.toString() || "1",
     stock_minimum: product?.stock_minimum?.toString() || "5",
     puissance:     product?.puissance    || "",
     diametre:      product?.diametre     || "",
