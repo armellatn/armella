@@ -15,7 +15,7 @@ export default async function BarcodesPage() {
       <Card>
         <CardHeader>
           <CardTitle>Générateur de codes-barres</CardTitle>
-          <CardDescription>Sélectionnez un produit et générez des codes-barres</CardDescription>
+          <CardDescription>Sélectionnez un ou plusieurs produits et générez les codes-barres</CardDescription>
         </CardHeader>
         <CardContent>
           <BarcodeGenerator products={products} />

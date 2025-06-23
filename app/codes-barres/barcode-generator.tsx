@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Printer, RefreshCw } from "lucide-react"
 import BarcodeSVG from "@/components/ui/BarcodeSVG"
 import { jsPDF } from "jspdf"
@@ -24,14 +23,10 @@ interface BarcodeGeneratorProps {
 }
 
 export default function BarcodeGenerator({ products }: BarcodeGeneratorProps) {
-  const [selectedProduct, setSelectedProduct] = useState<string>("")
+  const [selectedProducts, setSelectedProducts] = useState<string[]>([])
   const [barcodeSize, setBarcodeSize] = useState<string>("medium")
   const [layout, setLayout] = useState<string>("2x5")
   const [searchTerm, setSearchTerm] = useState("")
-
-  const getProduct = (id: string) => {
-    return products.find((product) => product.id.toString() === id)
-  }
 
   const filteredProducts = products.filter((p) =>
     p.nom.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -39,21 +34,19 @@ export default function BarcodeGenerator({ products }: BarcodeGeneratorProps) {
   )
 
   const generateBarcodes = () => {
-    if (!selectedProduct) return []
-
-    const product = getProduct(selectedProduct)
-    if (!product) return []
-
-    return [{
-      id: product.id,
-      code: product.code_produit,
-      name: product.nom,
-      brand: product.marque,
-    }]
+    return selectedProducts.map((id) => {
+      const product = products.find((p) => p.id.toString() === id)
+      if (!product) return null
+      return {
+        id: product.id,
+        code: product.code_produit,
+        name: product.nom,
+        brand: product.marque,
+      }
+    }).filter(Boolean)
   }
 
   const barcodes = generateBarcodes()
-  const [cols] = layout.split("x").map(Number)
 
   const getSizeClass = () => {
     switch (barcodeSize) {
@@ -67,25 +60,29 @@ export default function BarcodeGenerator({ products }: BarcodeGeneratorProps) {
   }
 
   const printAsPDF = () => {
-    const product = getProduct(selectedProduct)
-    if (!product) {
-      alert("Aucun produit sélectionné.")
-      return
-    }
+  if (selectedProducts.length === 0) {
+    alert("Aucun produit sélectionné.")
+    return
+  }
 
-    const pdf = new jsPDF({
-      orientation: "landscape",
-      unit: "mm",
-      format: [70, 35],
-    })
+  const pdf = new jsPDF({
+    orientation: "landscape",
+    unit: "mm",
+    format: [70, 35], // format étiquette
+  })
 
-    const canvas = document.createElement("canvas")
-    canvas.width = 800
-    canvas.height = 200
-    const ctx = canvas.getContext("2d")
-    ctx!.scale(4, 4)
+  const canvas = document.createElement("canvas")
+  canvas.width = 800
+  canvas.height = 200
+  const ctx = canvas.getContext("2d")
+  ctx!.scale(4, 4)
 
-    JsBarcode(canvas, product.code_produit, {
+  const barcodes = generateBarcodes()
+
+  barcodes.forEach((barcode, index) => {
+    if (index > 0) pdf.addPage() // Ajoute une nouvelle page à partir du 2e
+
+    JsBarcode(canvas, barcode.code, {
       format: "CODE128",
       displayValue: true,
       font: "monospace",
@@ -97,72 +94,74 @@ export default function BarcodeGenerator({ products }: BarcodeGeneratorProps) {
 
     const imgData = canvas.toDataURL("image/png")
     pdf.setFontSize(10)
-    pdf.text(product.nom, 35, 10, { align: "center" })
-    const barcodeWidth = 60
-    const barcodeX = (70 - barcodeWidth) / 2
-    pdf.addImage(imgData, "PNG", barcodeX, 12, barcodeWidth, 20)
+    pdf.text(barcode.name, 35, 10, { align: "center" })
+    pdf.addImage(imgData, "PNG", 5, 12, 60, 20)
+  })
 
-    pdf.autoPrint()
-    window.open(pdf.output("bloburl"), "_blank")
-  }
+  pdf.autoPrint()
+  window.open(pdf.output("bloburl"), "_blank")
+}
+
 
   return (
     <div className="space-y-6">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
         <div className="space-y-2">
-          <Label htmlFor="product">Produit</Label>
-          <Select value={selectedProduct} onValueChange={setSelectedProduct}>
-            <SelectTrigger id="product" className="h-12">
-              <SelectValue placeholder="Sélectionner un produit" />
-            </SelectTrigger>
-            <SelectContent>
-              <div className="p-2">
-                <Input
-                  placeholder="Rechercher un produit..."
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
+          <Label>Produits</Label>
+          <Input
+            placeholder="Rechercher un produit..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <div className="border rounded-md p-2 h-48 overflow-y-auto space-y-1">
+            {filteredProducts.map((product) => (
+              <div key={product.id} className="flex items-center space-x-2">
+                <input
+                  type="checkbox"
+                  id={`product-${product.id}`}
+                  checked={selectedProducts.includes(product.id.toString())}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setSelectedProducts([...selectedProducts, product.id.toString()])
+                    } else {
+                      setSelectedProducts(selectedProducts.filter(id => id !== product.id.toString()))
+                    }
+                  }}
                 />
-              </div>
-              {filteredProducts.map((product) => (
-                <SelectItem key={product.id} value={product.id.toString()}>
+                <label htmlFor={`product-${product.id}`} className="text-sm">
                   {product.nom} ({product.code_produit})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {selectedProduct && (
-            <p className="text-sm text-muted-foreground mt-2">
-              Quantité en stock : {getProduct(selectedProduct)?.stock_quantite  ?? "N/A"}
-            </p>
-          )}
+                </label>
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="size">Taille</Label>
-          <Select value={barcodeSize} onValueChange={setBarcodeSize}>
-            <SelectTrigger id="size" className="h-12">
-              <SelectValue placeholder="Taille des codes-barres" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="small">Petit</SelectItem>
-              <SelectItem value="medium">Moyen</SelectItem>
-              <SelectItem value="large">Grand</SelectItem>
-            </SelectContent>
-          </Select>
+          <select
+            id="size"
+            value={barcodeSize}
+            onChange={(e) => setBarcodeSize(e.target.value)}
+            className="w-full h-12 border rounded-md px-3"
+          >
+            <option value="small">Petit</option>
+            <option value="medium">Moyen</option>
+            <option value="large">Grand</option>
+          </select>
         </div>
 
         <div className="space-y-2">
           <Label htmlFor="layout">Disposition</Label>
-          <Select value={layout} onValueChange={setLayout}>
-            <SelectTrigger id="layout" className="h-12">
-              <SelectValue placeholder="Disposition" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="2x5">2 x 5</SelectItem>
-              <SelectItem value="3x8">3 x 8</SelectItem>
-              <SelectItem value="4x10">4 x 10</SelectItem>
-            </SelectContent>
-          </Select>
+          <select
+            id="layout"
+            value={layout}
+            onChange={(e) => setLayout(e.target.value)}
+            className="w-full h-12 border rounded-md px-3"
+          >
+            <option value="2x5">2 x 5</option>
+            <option value="3x8">3 x 8</option>
+            <option value="4x10">4 x 10</option>
+          </select>
         </div>
       </div>
 
@@ -170,11 +169,11 @@ export default function BarcodeGenerator({ products }: BarcodeGeneratorProps) {
         <Button
           variant="outline"
           onClick={() => {
-            setSelectedProduct("")
+            setSelectedProducts([])
             setSearchTerm("")
           }}
           className="h-12"
-          disabled={!selectedProduct}
+          disabled={selectedProducts.length === 0}
         >
           <RefreshCw className="mr-2 h-5 w-5" />
           Réinitialiser
