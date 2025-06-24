@@ -23,6 +23,8 @@ import { createProduct, updateProduct } from "./actions"
 /* -------------------------------------------------------------------------- */
 /*                               Validation Zod                               */
 /* -------------------------------------------------------------------------- */
+
+
 const productSchema = z.object({
   code_produit:  z.string().min(1, "Le code produit est requis"),
   nom:           z.string().min(1, "Le nom est requis"),
@@ -51,6 +53,8 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  
+const [stayOnForm, setStayOnForm] = useState(false)
 
   /* ----------------------------- Valeurs initiales ----------------------------- */
   const defaultValues: Partial<ProductFormValues> = {
@@ -158,10 +162,17 @@ stock_quantite: product?.stock_quantite?.toString() || "1",
       const res = product?.id
         ? await updateProduct(product.id, fd)
         : await createProduct(fd)
-      if (res.success) {
-        router.push("/produits")
-        router.refresh()
-      } else {
+if (res.success) {
+  if (stayOnForm) {
+    form.reset()
+    setIsSubmitting(false)
+    setStayOnForm(false)
+  } else {
+    router.push("/produits")
+    router.refresh()
+  }
+}
+ else {
         setError(res.error || "Une erreur est survenue")
         setIsSubmitting(false)
         if (res.error?.includes("code produit")) form.setFocus("code_produit")
@@ -457,6 +468,16 @@ stock_quantite: product?.stock_quantite?.toString() || "1",
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Enregistrement..." : product ? "Mettre à jour" : "Créer"}
           </Button>
+          {!product && (
+  <Button
+    type="submit"
+    variant="secondary"
+    disabled={isSubmitting}
+    onClick={() => setStayOnForm(true)}
+  >
+    {isSubmitting ? "Ajout..." : "Créer et ajouter un autre"}
+  </Button>
+)}
         </div>
       </form>
     </Form>
