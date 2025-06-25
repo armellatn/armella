@@ -5,25 +5,28 @@ import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
+
+/* ---------------------------------- UI kit --------------------------------- */
 import { Button } from "@/components/ui/button"
 import {
   Form, FormControl, FormDescription, FormField,
-  FormItem, FormLabel, FormMessage
+  FormItem, FormLabel, FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import {
   Select, SelectContent, SelectItem,
-  SelectTrigger, SelectValue
+  SelectTrigger, SelectValue,
 } from "@/components/ui/select"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
-import { createProduct, updateProduct } from "./actions"
+
+/* --------------------------- Server actions & types ------------------------- */
+import { createProduct, updateProduct, validateUniqueProductName } from "./actions"
 
 /* -------------------------------------------------------------------------- */
 /*                               Validation Zod                               */
 /* -------------------------------------------------------------------------- */
-
 
 const productSchema = z.object({
   code_produit:  z.string().min(1, "Le code produit est requis"),
@@ -53,8 +56,7 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  
-const [stayOnForm, setStayOnForm] = useState(false)
+  const [stayOnForm, setStayOnForm] = useState(false)
 
   /* ----------------------------- Valeurs initiales ----------------------------- */
   const defaultValues: Partial<ProductFormValues> = {
@@ -65,7 +67,7 @@ const [stayOnForm, setStayOnForm] = useState(false)
     description:   product?.description  || "",
     prix_achat:    product?.prix_achat?.toString() || "",
     prix_vente:    product?.prix_vente?.toString() || "",
-stock_quantite: product?.stock_quantite?.toString() || "1",
+    stock_quantite:product?.stock_quantite?.toString() || "1",
     stock_minimum: product?.stock_minimum?.toString() || "5",
     puissance:     product?.puissance    || "",
     diametre:      product?.diametre     || "",
@@ -101,18 +103,16 @@ stock_quantite: product?.stock_quantite?.toString() || "1",
     else if (upper.startsWith("MAY"))                                  setMarque("NOOR")
     else if (["MOOD","WILD"].some(p => upper.startsWith(p)))           setMarque("LEZZA")
 
-    /* -------- 2) Règles lentilles (catégorie, prix, durée, puissance) -------- */
+    /* -------- 2) Règles lentilles -------- */
     const regex = /(.*?)(\d+(?:mois|ans))(?:\s*(-?\d+(?:\.\d+)?))?/
     const match = lower.match(regex)
 
     if (match) {
       const [, , duree, pStr] = match
       const puissance = pStr ? parseFloat(pStr).toString() : "0"
-
       const isCorrection= !!pStr
 
       form.setValue("puissance", isCorrection ? puissance : "0")
-
       form.setValue("duree_port", duree)
       form.setValue("prix_achat", "0")
 
@@ -152,32 +152,54 @@ stock_quantite: product?.stock_quantite?.toString() || "1",
     form.setValue("code_produit", `${prefix}-${rnd}-${time}`)
   }
 
+  /* -------------------------------------------------------------------------- */
+  /*                 Validation immédiate du nom (unicité)                      */
+  /* -------------------------------------------------------------------------- */
+  async function validateNameOnBlur(value: string) {
+    const trimmed = value.trim()
+    if (!trimmed) return
+
+    const exists = await validateUniqueProductName(trimmed, product?.id)
+    if (exists) {
+      form.setError("nom", { type: "manual", message: "Ce nom de produit existe déjà" })
+    } else {
+      // si une erreur manuelle existait déjà, on la retire
+      if (form.formState.errors.nom?.type === "manual") {
+        form.clearErrors("nom")
+      }
+    }
+  }
+
   /* ---------------------------------- Submit ---------------------------------- */
   async function onSubmit(data: ProductFormValues) {
     setIsSubmitting(true)
     setError(null)
+
     try {
       const fd = new FormData()
-      Object.entries(data).forEach(([k,v]) => v !== undefined && fd.append(k, v))
+      Object.entries(data).forEach(([k, v]) => v !== undefined && fd.append(k, v))
+
       const res = product?.id
         ? await updateProduct(product.id, fd)
         : await createProduct(fd)
-if (res.success) {
-  if (stayOnForm) {
-    form.reset()
-    setIsSubmitting(false)
-    setStayOnForm(false)
-  } else {
-    router.push("/produits")
-    router.refresh()
-  }
-}
- else {
+
+      if (res.success) {
+        if (stayOnForm) {
+          form.reset()
+          setIsSubmitting(false)
+          setStayOnForm(false)
+        } else {
+          router.push("/produits")
+          router.refresh()
+        }
+      } else {
         setError(res.error || "Une erreur est survenue")
         setIsSubmitting(false)
-        if (res.error?.includes("code produit")) form.setFocus("code_produit")
+
+        if (res.error?.toLowerCase().includes("code produit")) form.setFocus("code_produit")
+        else if (res.error?.toLowerCase().includes("nom de produit")) form.setFocus("nom")
       }
-    } catch(e) {
+    } catch (e) {
       console.error(e)
       setError("Une erreur est survenue lors de l'enregistrement")
       setIsSubmitting(false)
@@ -188,6 +210,7 @@ if (res.success) {
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        {/* Erreur globale ----------------------------------------------- */}
         {error && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
@@ -196,7 +219,7 @@ if (res.success) {
           </Alert>
         )}
 
-        {/* LIGNE 1 : code + nom */}
+        {/* LIGNE 1 : code + nom ---------------------------------------- */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {/* Code produit */}
           <FormField
@@ -227,7 +250,14 @@ if (res.success) {
               <FormItem>
                 <FormLabel>Nom</FormLabel>
                 <FormControl>
-                  <Input {...field} placeholder="Ex : KADET 6mois -1" />
+                  <Input
+                    {...field}
+                    placeholder="Ex : KADET 6mois -1"
+                    onBlur={async (e) => {
+                      field.onBlur()
+                      await validateNameOnBlur(e.target.value)
+                    }}
+                  />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -235,9 +265,9 @@ if (res.success) {
           />
         </div>
 
-        {/* LIGNE 2 : marque + catégorie */}
+        {/* LIGNE 2 : marque + catégorie -------------------------------- */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {/* Marque (auto) */}
+          {/* Marque */}
           <FormField
             control={form.control}
             name="marque"
@@ -270,7 +300,7 @@ if (res.success) {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {categories.map(c => (
+                    {categories.map((c) => (
                       <SelectItem key={c.id} value={c.id.toString()}>
                         {c.nom}
                       </SelectItem>
@@ -283,7 +313,7 @@ if (res.success) {
           />
         </div>
 
-        {/* DESCRIPTION */}
+        {/* DESCRIPTION -------------------------------------------------- */}
         <FormField
           control={form.control}
           name="description"
@@ -298,7 +328,7 @@ if (res.success) {
           )}
         />
 
-        {/* LIGNE 3 : puissance / durée / prix vente / prix achat */}
+        {/* LIGNE 3 : puissance / durée / prix -------------------------- */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <FormField
             control={form.control}
@@ -307,11 +337,7 @@ if (res.success) {
               <FormItem>
                 <FormLabel>Puissance</FormLabel>
                 <FormControl>
-                  <Input
-                    value={field.value || ""}
-                    onChange={field.onChange}
-                    placeholder="-1.00"
-                  />
+                  <Input value={field.value || ""} onChange={field.onChange} placeholder="-1.00" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -325,11 +351,7 @@ if (res.success) {
               <FormItem>
                 <FormLabel>Durée de port</FormLabel>
                 <FormControl>
-                  <Input
-                    value={field.value || ""}
-                    onChange={field.onChange}
-                    placeholder="6mois / 1ans"
-                  />
+                  <Input value={field.value || ""} onChange={field.onChange} placeholder="6mois / 1ans" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -343,11 +365,7 @@ if (res.success) {
               <FormItem>
                 <FormLabel>Prix vente (TND)</FormLabel>
                 <FormControl>
-                  <Input
-                    type="number"
-                    value={field.value || ""}
-                    onChange={field.onChange}
-                  />
+                  <Input type="number" value={field.value || ""} onChange={field.onChange} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -361,11 +379,7 @@ if (res.success) {
               <FormItem>
                 <FormLabel>Prix achat (TND)</FormLabel>
                 <FormControl>
-                  <Input
-                    type="number"
-                    value={field.value || ""}
-                    onChange={field.onChange}
-                  />
+                  <Input type="number" value={field.value || ""} onChange={field.onChange} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -373,7 +387,7 @@ if (res.success) {
           />
         </div>
 
-        {/* LIGNE 4 : stock, diamètre, courbure */}
+        {/* LIGNE 4 : stock / diamètre / courbure ----------------------- */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <FormField
             control={form.control}
@@ -411,11 +425,7 @@ if (res.success) {
               <FormItem>
                 <FormLabel>Diamètre</FormLabel>
                 <FormControl>
-                  <Input
-                    value={field.value || ""}
-                    onChange={field.onChange}
-                    placeholder="Ex : 14.2"
-                  />
+                  <Input value={field.value || ""} onChange={field.onChange} placeholder="Ex : 14.2" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -429,11 +439,7 @@ if (res.success) {
               <FormItem>
                 <FormLabel>Courbure</FormLabel>
                 <FormControl>
-                  <Input
-                    value={field.value || ""}
-                    onChange={field.onChange}
-                    placeholder="Ex : 8.6"
-                  />
+                  <Input value={field.value || ""} onChange={field.onChange} placeholder="Ex : 8.6" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -441,7 +447,7 @@ if (res.success) {
           />
         </div>
 
-        {/* Contenu boîte */}
+        {/* Contenu boîte ------------------------------------------------ */}
         <FormField
           control={form.control}
           name="contenu_boite"
@@ -449,18 +455,14 @@ if (res.success) {
             <FormItem>
               <FormLabel>Contenu de la boîte</FormLabel>
               <FormControl>
-                <Input
-                  value={field.value || ""}
-                  onChange={field.onChange}
-                  placeholder="Ex : 30 lentilles"
-                />
+                <Input value={field.value || ""} onChange={field.onChange} placeholder="Ex : 30 lentilles" />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
 
-        {/* BOUTONS */}
+        {/* BOUTONS ------------------------------------------------------ */}
         <div className="flex justify-end space-x-4">
           <Button type="button" variant="outline" onClick={() => router.push("/produits")}>
             Annuler
@@ -469,15 +471,15 @@ if (res.success) {
             {isSubmitting ? "Enregistrement..." : product ? "Mettre à jour" : "Créer"}
           </Button>
           {!product && (
-  <Button
-    type="submit"
-    variant="secondary"
-    disabled={isSubmitting}
-    onClick={() => setStayOnForm(true)}
-  >
-    {isSubmitting ? "Ajout..." : "Créer et ajouter un autre"}
-  </Button>
-)}
+            <Button
+              type="submit"
+              variant="secondary"
+              disabled={isSubmitting}
+              onClick={() => setStayOnForm(true)}
+            >
+              {isSubmitting ? "Ajout..." : "Créer et ajouter un autre"}
+            </Button>
+          )}
         </div>
       </form>
     </Form>
