@@ -128,9 +128,11 @@ export default function BarcodeGenerator({ products }: BarcodeGeneratorProps) {
                     }
                   }}
                 />
-                <label htmlFor={`product-${product.id}`} className="text-sm">
-                  {product.nom} ({product.code_produit})
-                </label>
+<label htmlFor={`product-${product.id}`} className="text-sm flex flex-col">
+  <span>{product.nom} ({product.code_produit})</span>
+  <span className="text-xs text-muted-foreground">Stock : {product.stock_quantite}</span>
+</label>
+
               </div>
             ))}
           </div>
