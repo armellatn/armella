@@ -36,8 +36,8 @@ export async function getProducts() {
   try {
     const result = await db.query(`
       SELECT id, code_produit, nom, marque, categorie_id,
-             prix_vente::float AS prix_vente,  -- for proper JS type
-             stock_quantite, puissance, diametre
+             prix_vente::float AS prix_vente,
+             stock_quantite, puissance, diametre, duree_port
       FROM produits
       WHERE stock_quantite > 0
       ORDER BY nom ASC
@@ -48,6 +48,7 @@ export async function getProducts() {
     return []
   }
 }
+
 
 export async function getClients() {
   try {

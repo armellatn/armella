@@ -1,12 +1,12 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 
-/* ---------------------------------- UI kit --------------------------------- */
+/* ----------------------------- UI components ------------------------------ */
 import { Button } from "@/components/ui/button"
 import {
   Form, FormControl, FormDescription, FormField,
@@ -21,28 +21,29 @@ import {
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { AlertCircle } from "lucide-react"
 
-/* --------------------------- Server actions & types ------------------------- */
-import { createProduct, updateProduct, validateUniqueProductName } from "./actions"
+/* --------------------------- Server actions ------------------------------- */
+import {
+  createProduct,
+  updateProduct,
+  validateUniqueProductName,
+} from "./actions"
 
-/* -------------------------------------------------------------------------- */
-/*                               Validation Zod                               */
-/* -------------------------------------------------------------------------- */
-
+/* ------------------------------ Validation -------------------------------- */
 const productSchema = z.object({
-  code_produit:  z.string().min(1, "Le code produit est requis"),
-  nom:           z.string().min(1, "Le nom est requis"),
-  marque:        z.string().min(1, "La marque est requise"),
-  categorie_id:  z.string().min(1, "La catégorie est requise"),
-  description:   z.string().optional(),
-  prix_achat:    z.string().min(1, "Le prix d'achat est requis"),
-  prix_vente:    z.string().min(1, "Le prix de vente est requis"),
-  stock_quantite:z.string().min(1, "La quantité en stock est requise"),
-  stock_minimum: z.string().min(1, "Le stock minimum est requis"),
-  puissance:     z.string().optional(),
-  diametre:      z.string().optional(),
-  courbure:      z.string().optional(),
-  duree_port:    z.string().optional(),
-  contenu_boite: z.string().optional(),
+  code_produit:   z.string().min(1, "Le code produit est requis"),
+  nom:            z.string().min(1, "Le nom est requis"),
+  marque:         z.string().min(1, "La marque est requise"),
+  categorie_id:   z.string().min(1, "La catégorie est requise"),
+  description:    z.string().optional(),
+  prix_achat:     z.string().min(1, "Le prix d'achat est requis"),
+  prix_vente:     z.string().min(1, "Le prix de vente est requis"),
+  stock_quantite: z.string().min(1, "La quantité en stock est requise"),
+  stock_minimum:  z.string().min(1, "Le stock minimum est requis"),
+  puissance:      z.string().optional(),
+  diametre:       z.string().optional(),
+  courbure:       z.string().optional(),
+  duree_port:     z.string().optional(),
+  contenu_boite:  z.string().optional(),
 })
 
 type ProductFormValues = z.infer<typeof productSchema>
@@ -56,24 +57,25 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [stayOnForm, setStayOnForm] = useState(false)
+  const [stayOnForm, setStayOnForm] = useState(false)   // « Créer et ajouter un autre »
+  const nomRef = useRef<HTMLInputElement>(null)         // focus après création
 
-  /* ----------------------------- Valeurs initiales ----------------------------- */
+  /* --------------------------- Valeurs initiales --------------------------- */
   const defaultValues: Partial<ProductFormValues> = {
-    code_produit:  product?.code_produit || "",
-    nom:           product?.nom          || "",
-    marque:        product?.marque       || "",
-    categorie_id:  product?.categorie_id?.toString() || "",
-    description:   product?.description  || "",
-    prix_achat:    product?.prix_achat?.toString() || "",
-    prix_vente:    product?.prix_vente?.toString() || "",
-    stock_quantite:product?.stock_quantite?.toString() || "1",
-    stock_minimum: product?.stock_minimum?.toString() || "5",
-    puissance:     product?.puissance    || "",
-    diametre:      product?.diametre     || "",
-    courbure:      product?.courbure     || "",
-    duree_port:    product?.duree_port   || "",
-    contenu_boite: product?.contenu_boite|| "",
+    code_produit:   product?.code_produit || "",
+    nom:            product?.nom || "",
+    marque:         product?.marque || "",
+    categorie_id:   product?.categorie_id?.toString() || "",
+    description:    product?.description || "",
+    prix_achat:     product?.prix_achat?.toString() || "",
+    prix_vente:     product?.prix_vente?.toString() || "",
+    stock_quantite: product?.stock_quantite?.toString() || "1",
+    stock_minimum:  product?.stock_minimum?.toString() || "5",
+    puissance:      product?.puissance || "",
+    diametre:       product?.diametre || "",
+    courbure:       product?.courbure || "",
+    duree_port:     product?.duree_port || "",
+    contenu_boite:  product?.contenu_boite || "",
   }
 
   const form = useForm<ProductFormValues>({
@@ -81,136 +83,137 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
     defaultValues,
   })
 
-  /* -------------------------------------------------------------------------- */
-  /*                 Auto-remplissage déclenché quand le nom change             */
-  /* -------------------------------------------------------------------------- */
+  /* ---------------------- Auto-complétion à partir du nom ------------------ */
   const nomValue = form.watch("nom") ?? ""
 
   useEffect(() => {
     const raw   = nomValue.trim()
     const lower = raw.toLowerCase()
     const upper = raw.toUpperCase()
-
-    /* -------- 1) Marque automatique -------- */
     const setMarque = (m: string) => form.setValue("marque", m)
 
-    if (upper.startsWith("KADET"))                                     setMarque("LORANS")
-    else if (["WHITE","MAGIC","AZURE","TROPICAL","PURE","KENZO","LAZORDE"]
-            .some(p => upper.startsWith(p)))                           setMarque("LAZORD")
-    else if (upper.startsWith("LIO"))                                  setMarque("NK")
-    else if (["CATY","LAVA"].some(p => upper.startsWith(p)))           setMarque("ARMELLA")
-    else if (["MAROUN","DESI","DIVA"].some(p => upper.startsWith(p)))  setMarque("VICTORIA")
-    else if (upper.startsWith("MAY"))                                  setMarque("NOOR")
-    else if (["MOOD","WILD"].some(p => upper.startsWith(p)))           setMarque("LEZZA")
+    if (upper.startsWith("KADET")) setMarque("LORANS")
+    else if (["WHITE","MAGIC","AZURE","TROPICAL","PURE","KENZO","LAZORDE"].some(p => upper.startsWith(p))) setMarque("LAZORD")
+    else if (upper.startsWith("LIO")) setMarque("NK")
+    else if (["CATY","LAVA"].some(p => upper.startsWith(p))) setMarque("ARMELLA")
+    else if (["MAROUN","DESI","DIVA"].some(p => upper.startsWith(p))) setMarque("VICTORIA")
+    else if (upper.startsWith("MAY")) setMarque("NOOR")
+    else if (["MOOD","WILD"].some(p => upper.startsWith(p))) setMarque("LEZZA")
 
-    /* -------- 2) Règles lentilles -------- */
     const regex = /(.*?)(\d+(?:mois|ans))(?:\s*(-?\d+(?:\.\d+)?))?/
     const match = lower.match(regex)
 
     if (match) {
       const [, , duree, pStr] = match
       const puissance = pStr ? parseFloat(pStr).toString() : "0"
-      const isCorrection= !!pStr
+      const isCorrection = !!pStr
 
-      form.setValue("puissance", isCorrection ? puissance : "0")
+      form.setValue("puissance", puissance)
       form.setValue("duree_port", duree)
       form.setValue("prix_achat", "0")
 
       if (isCorrection && duree.includes("6mois")) {
         form.setValue("prix_vente", "110")
-        form.setValue("categorie_id", getCategorieId("Correction"))
+        form.setValue("categorie_id", getCatId("Correction"))
       } else if (isCorrection && duree.includes("1ans")) {
         form.setValue("prix_vente", "140")
-        form.setValue("categorie_id", getCategorieId("Correction"))
+        form.setValue("categorie_id", getCatId("Correction"))
       } else if (!isCorrection && duree.includes("6mois")) {
         form.setValue("prix_vente", "90")
-        form.setValue("categorie_id", getCategorieId("Sans Correction"))
+        form.setValue("categorie_id", getCatId("Sans Correction"))
       } else if (!isCorrection && duree.includes("1ans")) {
         form.setValue("prix_vente", "120")
-        form.setValue("categorie_id", getCategorieId("Sans Correction"))
+        form.setValue("categorie_id", getCatId("Sans Correction"))
       }
     } else if (lower.includes("accessoire")) {
-      form.setValue("puissance",  "0")
+      form.setValue("puissance", "0")
       form.setValue("duree_port", "")
       form.setValue("prix_vente", "25")
       form.setValue("prix_achat", "0")
-      form.setValue("categorie_id", getCategorieId("Accessoire"))
+      form.setValue("categorie_id", getCatId("Accessoire"))
     }
   }, [nomValue])
 
-  /* --------------------------- Utilitaire catégorie --------------------------- */
-  function getCategorieId(n: string): string {
-    const cat = categories.find(c => c.nom.toLowerCase() === n.toLowerCase())
+  function getCatId(label: string): string {
+    const cat = categories.find(c => c.nom.toLowerCase() === label.toLowerCase())
     return cat ? cat.id.toString() : ""
   }
 
-  /* ---------------------- Génération aléatoire du code produit ---------------------- */
+  /* ---------------------- Génération aléatoire du code --------------------- */
   const generateRandomCode = () => {
     const prefix = "LEN"
-    const rnd    = Math.floor(Math.random() * 10000).toString().padStart(4, "0")
-    const time   = Date.now().toString().slice(-4)
+    const rnd  = Math.floor(Math.random() * 10000).toString().padStart(4, "0")
+    const time = Date.now().toString().slice(-4)
     form.setValue("code_produit", `${prefix}-${rnd}-${time}`)
   }
 
-  /* -------------------------------------------------------------------------- */
-  /*                 Validation immédiate du nom (unicité)                      */
-  /* -------------------------------------------------------------------------- */
+  /* --------------------- Validation unicité du nom ------------------------- */
   async function validateNameOnBlur(value: string) {
     const trimmed = value.trim()
     if (!trimmed) return
-
     const exists = await validateUniqueProductName(trimmed, product?.id)
-    if (exists) {
-      form.setError("nom", { type: "manual", message: "Ce nom de produit existe déjà" })
-    } else {
-      // si une erreur manuelle existait déjà, on la retire
-      if (form.formState.errors.nom?.type === "manual") {
-        form.clearErrors("nom")
-      }
-    }
+    if (exists) form.setError("nom", { type: "manual", message: "Ce nom de produit existe déjà" })
+    else if (form.formState.errors.nom?.type === "manual") form.clearErrors("nom")
   }
 
-  /* ---------------------------------- Submit ---------------------------------- */
+  /* ----------------------------- Soumission -------------------------------- */
   async function onSubmit(data: ProductFormValues) {
     setIsSubmitting(true)
     setError(null)
-
     try {
       const fd = new FormData()
       Object.entries(data).forEach(([k, v]) => v !== undefined && fd.append(k, v))
-
-      const res = product?.id
-        ? await updateProduct(product.id, fd)
-        : await createProduct(fd)
+      const res = product?.id ? await updateProduct(product.id, fd)
+                              : await createProduct(fd)
 
       if (res.success) {
         if (stayOnForm) {
           form.reset()
-          setIsSubmitting(false)
+          generateRandomCode()
+          nomRef.current?.focus()
           setStayOnForm(false)
-        } else {
-          router.push("/produits")
-          router.refresh()
+          setIsSubmitting(false)
+          return        // on reste sur le formulaire
         }
+        router.push("/produits")
+        router.refresh()
       } else {
         setError(res.error || "Une erreur est survenue")
         setIsSubmitting(false)
-
-        if (res.error?.toLowerCase().includes("code produit")) form.setFocus("code_produit")
-        else if (res.error?.toLowerCase().includes("nom de produit")) form.setFocus("nom")
       }
-    } catch (e) {
-      console.error(e)
+    } catch (err) {
+      console.error(err)
       setError("Une erreur est survenue lors de l'enregistrement")
       setIsSubmitting(false)
     }
   }
 
-  /* ------------------------------------ UI ------------------------------------ */
+  /* ---- Fonction spéciale pour Ctrl + Entrée (active stayOnForm puis submit) */
+  const handleCtrlEnter = async () => {
+    setStayOnForm(true)
+    await form.handleSubmit(onSubmit)()
+  }
+
+  /* ----------------------- Raccourci clavier global ------------------------ */
+useEffect(() => {
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.ctrlKey && e.key === "Enter") {
+      e.preventDefault()
+      setStayOnForm(true)
+      // Utilise la version ACTUELLE de la fonction
+      form.handleSubmit((data) => onSubmit(data))()
+    }
+  }
+
+  window.addEventListener("keydown", handleKeyDown)
+  return () => window.removeEventListener("keydown", handleKeyDown)
+}, [form])
+
+  /* ----------------------------- Rendu ------------------------------------- */
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-        {/* Erreur globale ----------------------------------------------- */}
+
         {error && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
@@ -219,9 +222,8 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
           </Alert>
         )}
 
-        {/* LIGNE 1 : code + nom ---------------------------------------- */}
+        {/* LIGNE 1 : Code produit + Nom */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {/* Code produit */}
           <FormField
             control={form.control}
             name="code_produit"
@@ -242,7 +244,6 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
             )}
           />
 
-          {/* Nom */}
           <FormField
             control={form.control}
             name="nom"
@@ -252,6 +253,7 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
                 <FormControl>
                   <Input
                     {...field}
+                    ref={nomRef}
                     placeholder="Ex : KADET 6mois -1"
                     onBlur={async (e) => {
                       field.onBlur()
@@ -265,9 +267,8 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
           />
         </div>
 
-        {/* LIGNE 2 : marque + catégorie -------------------------------- */}
+        {/* LIGNE 2 : Marque + Catégorie */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {/* Marque */}
           <FormField
             control={form.control}
             name="marque"
@@ -275,18 +276,13 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
               <FormItem>
                 <FormLabel>Marque</FormLabel>
                 <FormControl>
-                  <Input
-                    value={field.value || ""}
-                    onChange={field.onChange}
-                    placeholder="Auto si KADET, LIO, etc."
-                  />
+                  <Input {...field} placeholder="Auto si KADET, LIO…" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )}
           />
 
-          {/* Catégorie */}
           <FormField
             control={form.control}
             name="categorie_id"
@@ -300,10 +296,8 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    {categories.map((c) => (
-                      <SelectItem key={c.id} value={c.id.toString()}>
-                        {c.nom}
-                      </SelectItem>
+                    {categories.map(c => (
+                      <SelectItem key={c.id} value={c.id.toString()}>{c.nom}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -313,7 +307,7 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
           />
         </div>
 
-        {/* DESCRIPTION -------------------------------------------------- */}
+        {/* DESCRIPTION */}
         <FormField
           control={form.control}
           name="description"
@@ -328,7 +322,7 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
           )}
         />
 
-        {/* LIGNE 3 : puissance / durée / prix -------------------------- */}
+        {/* LIGNE 3 : Puissance / Durée / Prix */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <FormField
             control={form.control}
@@ -337,7 +331,7 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
               <FormItem>
                 <FormLabel>Puissance</FormLabel>
                 <FormControl>
-                  <Input value={field.value || ""} onChange={field.onChange} placeholder="-1.00" />
+                  <Input {...field} placeholder="-1.00" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -351,7 +345,7 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
               <FormItem>
                 <FormLabel>Durée de port</FormLabel>
                 <FormControl>
-                  <Input value={field.value || ""} onChange={field.onChange} placeholder="6mois / 1ans" />
+                  <Input {...field} placeholder="6mois / 1ans" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -365,7 +359,7 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
               <FormItem>
                 <FormLabel>Prix vente (TND)</FormLabel>
                 <FormControl>
-                  <Input type="number" value={field.value || ""} onChange={field.onChange} />
+                  <Input type="number" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -379,7 +373,7 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
               <FormItem>
                 <FormLabel>Prix achat (TND)</FormLabel>
                 <FormControl>
-                  <Input type="number" value={field.value || ""} onChange={field.onChange} />
+                  <Input type="number" {...field} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -387,7 +381,7 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
           />
         </div>
 
-        {/* LIGNE 4 : stock / diamètre / courbure ----------------------- */}
+        {/* LIGNE 4 : Stock / Diamètre / Courbure */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <FormField
             control={form.control}
@@ -412,7 +406,7 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
                 <FormControl>
                   <Input type="number" {...field} />
                 </FormControl>
-                <FormDescription>Seuil d’alerte de réapprovisionnement</FormDescription>
+                <FormDescription>Seuil de réapprovisionnement</FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -425,7 +419,7 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
               <FormItem>
                 <FormLabel>Diamètre</FormLabel>
                 <FormControl>
-                  <Input value={field.value || ""} onChange={field.onChange} placeholder="Ex : 14.2" />
+                  <Input {...field} placeholder="14.2" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -439,7 +433,7 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
               <FormItem>
                 <FormLabel>Courbure</FormLabel>
                 <FormControl>
-                  <Input value={field.value || ""} onChange={field.onChange} placeholder="Ex : 8.6" />
+                  <Input {...field} placeholder="8.6" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -447,7 +441,7 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
           />
         </div>
 
-        {/* Contenu boîte ------------------------------------------------ */}
+        {/* Contenu boîte */}
         <FormField
           control={form.control}
           name="contenu_boite"
@@ -455,21 +449,23 @@ export default function ProductForm({ product, categories }: ProductFormProps) {
             <FormItem>
               <FormLabel>Contenu de la boîte</FormLabel>
               <FormControl>
-                <Input value={field.value || ""} onChange={field.onChange} placeholder="Ex : 30 lentilles" />
+                <Input {...field} placeholder="Ex : 30 lentilles" />
               </FormControl>
               <FormMessage />
             </FormItem>
           )}
         />
 
-        {/* BOUTONS ------------------------------------------------------ */}
+        {/* Boutons */}
         <div className="flex justify-end space-x-4">
           <Button type="button" variant="outline" onClick={() => router.push("/produits")}>
             Annuler
           </Button>
+
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? "Enregistrement..." : product ? "Mettre à jour" : "Créer"}
           </Button>
+
           {!product && (
             <Button
               type="submit"

@@ -225,13 +225,7 @@ export default function POSSystem({
     const matchesDuree =
       selectedDureePort === "all" || p.duree_port === selectedDureePort
 
-    return (
-      matchesSearch &&
-      matchesCategory &&
-      matchesMarque &&
-      matchesPuissance &&
-      matchesDuree
-    )
+    return matchesSearch && matchesCategory && matchesMarque && matchesPuissance && matchesDuree
   })
 
   /* ------------------------------------------------------------------ */
@@ -516,7 +510,8 @@ export default function POSSystem({
       {/* ---------------------------------------------------------------- */}
       {/*                               PANIER                             */}
       {/* ---------------------------------------------------------------- */}
-      <div className="flex flex-col rounded-lg border bg-card shadow-sm">
+    <div className="flex flex-col h-screen rounded-lg border bg-card shadow-sm">
+
         {/* En-tête panier */}
         <div className="p-4 space-y-1.5">
           <h3 className="text-lg font-semibold">Panier</h3>
@@ -620,7 +615,7 @@ export default function POSSystem({
         <Separator />
 
         {/* Totaux */}
-        <div className="p-4 space-y-2">
+<div className="p-4 space-y-2 sticky bottom-[72px] bg-card z-10 border-t">
           <div className="flex justify-between">
             <span>Sous-total</span>
             <span>{formatPrice(subtotal)} TND</span>
@@ -647,7 +642,7 @@ export default function POSSystem({
         </div>
 
         {/* Boutons panier */}
-        <div className="p-4 grid grid-cols-2 gap-2">
+<div className="p-4 grid grid-cols-2 gap-2 sticky bottom-0 bg-card border-t z-10">
           <Button variant="outline" onClick={clearCart}>
             Annuler
           </Button>

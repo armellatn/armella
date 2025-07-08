@@ -17,7 +17,14 @@ export default async function POSPage() {
   ])
 
   // Extraire les valeurs uniques pour les nouveaux filtres
-  const marques = Array.from(new Set(products.map(p => p.marque).filter(Boolean)))
+const marques = Array.from(
+  new Map(
+    products
+      .filter(p => p.marque)
+      .map(p => [p.marque.toLowerCase(), p.marque])
+  ).values()
+)
+
   const puissances = Array.from(new Set(products.map(p => p.puissance).filter(Boolean)))
   const durees = Array.from(new Set(products.map(p => p.duree_port).filter(Boolean)))
 
