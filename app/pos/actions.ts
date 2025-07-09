@@ -32,6 +32,7 @@ export type CartItem = {
   total: number
 }
 
+// 🛒 Produits disponibles
 export async function getProducts() {
   try {
     const result = await db.query(`
@@ -49,7 +50,7 @@ export async function getProducts() {
   }
 }
 
-
+// 👤 Clients
 export async function getClients() {
   try {
     const result = await db.query(`
@@ -64,6 +65,7 @@ export async function getClients() {
   }
 }
 
+// ✅ Création d'une vente
 export async function createSale(
   clientId: number | null,
   items: CartItem[],
@@ -72,30 +74,15 @@ export async function createSale(
   paymentMethod: string,
   notes: string
 ) {
-  const clientValue = clientId ? clientId : null
-
-  // 🔍 Debug Log: Entrée de la vente
-  console.log("🧾 [createSale] Vente reçue :", {
-    clientId,
-    items,
-    total,
-    discount,
-    montant_paye: total - discount,
-    items_details: items.map((i) => ({
-      produit_id: i.product.id,
-      prix_unitaire: i.price,
-      quantite: i.quantity,
-      total: i.total,
-    })),
-  })
+  const clientValue = clientId ?? null
 
   try {
     const date = new Date()
     const invoiceNumber = `INV-${date.getFullYear()}${(date.getMonth() + 1)
       .toString()
       .padStart(2, "0")}${date.getDate().toString().padStart(2, "0")}-${Math.floor(Math.random() * 1000)
-      .toString()
-      .padStart(3, "0")}`
+        .toString()
+        .padStart(3, "0")}`
 
     const result = await db.query(
       `INSERT INTO ventes (
@@ -106,18 +93,8 @@ export async function createSale(
     )
 
     const saleId = result.rows[0].id
-    console.log("✅ Vente créée avec ID:", saleId)
 
     for (const item of items) {
-      // 🔍 Debug Log: Article en cours d'insertion
-      console.log("📦 Insertion dans details_vente:", {
-        vente_id: saleId,
-        produit_id: item.product.id,
-        quantite: item.quantity,
-        prix_unitaire: item.price,
-        montant_total: item.total,
-      })
-
       await db.query(
         `INSERT INTO details_vente (
           vente_id, produit_id, quantite, prix_unitaire, montant_total
@@ -126,7 +103,9 @@ export async function createSale(
       )
 
       await db.query(
-        `UPDATE produits SET stock_quantite = stock_quantite - $1 WHERE id = $2`,
+        `UPDATE produits
+         SET stock_quantite = stock_quantite - $1
+         WHERE id = $2`,
         [item.quantity, item.product.id]
       )
 
@@ -145,6 +124,7 @@ export async function createSale(
       )
     }
 
+    // Revalidation
     revalidatePath("/pos")
     revalidatePath("/produits")
     revalidatePath("/factures")
@@ -156,10 +136,11 @@ export async function createSale(
   }
 }
 
+// 📄 Liste des factures
 export async function getInvoices(limit = 50) {
   try {
     const result = await db.query(
-      `SELECT v.id, v.numero_facture, v.date_vente, v.montant_total, v.remise, 
+      `SELECT v.id, v.numero_facture, v.date_vente, v.montant_total, v.remise,
               v.montant_paye, v.methode_paiement, v.statut,
               c.nom || ' ' || c.prenom as client_nom
        FROM ventes v
@@ -175,10 +156,11 @@ export async function getInvoices(limit = 50) {
   }
 }
 
+// 🧾 Détail d’une facture
 export async function getInvoiceDetails(id: number) {
   try {
     const invoiceResult = await db.query(
-      `SELECT v.*, c.nom as client_nom, c.prenom as client_prenom, 
+      `SELECT v.*, c.nom as client_nom, c.prenom as client_prenom,
               c.email as client_email, c.telephone as client_telephone
        FROM ventes v
        LEFT JOIN clients c ON v.client_id = c.id
@@ -204,6 +186,47 @@ export async function getInvoiceDetails(id: number) {
     }
   } catch (error) {
     console.error(`❌ Error fetching invoice ${id}:`, error)
+    return null
+  }
+}
+
+// 🔍 Recherche client
+export async function searchClients(query: string) {
+  try {
+    const result = await db.query(`
+      SELECT id, nom, prenom, email, telephone
+      FROM clients
+      WHERE nom ILIKE $1 OR prenom ILIKE $1 OR telephone ILIKE $1
+      ORDER BY nom, prenom
+    `, [`%${query}%`])
+    return result.rows
+  } catch (error) {
+    console.error("❌ Error searching clients:", error)
+    return []
+  }
+}
+
+// ➕ Création d’un nouveau client
+export async function createClient({
+  nom,
+  prenom,
+  telephone,
+  email = "",
+}: {
+  nom: string
+  prenom: string
+  telephone: string
+  email?: string
+}) {
+  try {
+    const result = await db.query(`
+      INSERT INTO clients (nom, prenom, telephone, email)
+      VALUES ($1, $2, $3, $4)
+      RETURNING id, nom, prenom, telephone, email
+    `, [nom, prenom, telephone, email])
+    return result.rows[0]
+  } catch (error) {
+    console.error("❌ Error creating client:", error)
     return null
   }
 }

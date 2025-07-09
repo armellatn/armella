@@ -28,6 +28,7 @@ import { DialogHeader } from "@/components/ui/dialog"
 import { DialogTitle } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
+import ClientSelectorDialog from "@/components/client-selector-dialog"
 
 // ---------------------------------------------------------------------
 //  Icônes
@@ -100,6 +101,7 @@ export default function POSSystem({
   // 🔍 États pour le scanner douchette
   const [scanTimeout, setScanTimeout] = useState<NodeJS.Timeout | null>(null)
   const barcodeRef = useRef("")
+const [showClientDialog, setShowClientDialog] = useState(false)
 
   /* ------------------------------------------------------------------ */
   /*                       PANIER / PRODUITS                             */
@@ -524,22 +526,16 @@ export default function POSSystem({
         {/* Sélection client */}
         <div className="p-4">
           <Label htmlFor="client">Client</Label>
-          <Select
-            value={selectedClient?.toString() || ""}
-            onValueChange={v => setSelectedClient(v ? +v : null)}
-          >
-            <SelectTrigger id="client">
-              <SelectValue placeholder="Sélectionner un client" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="0">Client occasionnel</SelectItem>
-              {clients.map(c => (
-                <SelectItem key={c.id} value={c.id.toString()}>
-                  {c.nom} {c.prenom}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <Button
+  variant="outline"
+  onClick={() => setShowClientDialog(true)}
+  className="w-full mt-2"
+>
+  {selectedClient
+    ? clients.find(c => c.id === selectedClient)?.nom + " " + clients.find(c => c.id === selectedClient)?.prenom
+    : "Sélectionner ou ajouter un client"}
+</Button>
+
         </div>
 
         {/* Tableau panier */}
@@ -767,6 +763,18 @@ export default function POSSystem({
           </div>
         </DialogContent>
       </Dialog>
+      <ClientSelectorDialog
+  open={showClientDialog}
+  onClose={() => setShowClientDialog(false)}
+ onSelectClient={(client: Client) => {
+  setSelectedClient(client.id)
+  if (!clients.find(c => c.id === client.id)) {
+    clients.push(client)
+  }
+}}
+
+/>
+
     </div>
   )
 }
