@@ -236,3 +236,16 @@ export async function deleteProduct(id: number) {
     return { success: false, error: "Erreur lors de la suppression du produit" }
   }
 }
+export async function updateStock(id: number, newStock: number) {
+  try {
+    await db.query(`UPDATE produits SET stock_quantite = $1, updated_at = CURRENT_TIMESTAMP WHERE id = $2`, [
+      newStock,
+      id,
+    ])
+    revalidatePath("/produits")
+    return { success: true }
+  } catch (error) {
+    console.error(`Error updating stock for product ${id}:`, error)
+    return { success: false, error: "Erreur lors de la mise à jour du stock" }
+  }
+}

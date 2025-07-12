@@ -14,7 +14,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Edit, MoreHorizontal, Search, Trash } from "lucide-react"
-import { type Product, deleteProduct } from "./actions"
+import { type Product, deleteProduct, updateStock } from "./actions"
 
 interface ProductsTableProps {
   products: Product[]
@@ -22,6 +22,8 @@ interface ProductsTableProps {
 
 export default function ProductsTable({ products }: ProductsTableProps) {
   const [searchTerm, setSearchTerm] = useState("")
+  const [editingStockId, setEditingStockId] = useState<number | null>(null)
+  const [stockValue, setStockValue] = useState<number | null>(null)
 
   const filteredProducts = products.filter(
     (product) =>
@@ -41,11 +43,15 @@ export default function ProductsTable({ products }: ProductsTableProps) {
     }
   }
 
-  // Fonction pour formater le prix avec 2 décimales
+  const handleStockSave = async (productId: number) => {
+    if (stockValue != null) {
+      await updateStock(productId, stockValue)
+    }
+    setEditingStockId(null)
+  }
+
   const formatPrice = (price: any): string => {
-    // S'assurer que le prix est un nombre
     const numPrice = typeof price === "number" ? price : Number(price)
-    // Vérifier si c'est un nombre valide
     return isNaN(numPrice) ? "0.00" : numPrice.toFixed(2)
   }
 
@@ -89,7 +95,29 @@ export default function ProductsTable({ products }: ProductsTableProps) {
                   <TableCell>{product.marque}</TableCell>
                   <TableCell>{product.categorie}</TableCell>
                   <TableCell className="text-right">{formatPrice(product.prix_vente)} TND</TableCell>
-                  <TableCell className="text-right">{product.stock_quantite}</TableCell>
+                  <TableCell
+                    className="text-right cursor-pointer"
+                    onDoubleClick={() => {
+                      setEditingStockId(product.id)
+                      setStockValue(product.stock_quantite)
+                    }}
+                  >
+                    {editingStockId === product.id ? (
+                      <input
+                        type="number"
+                        value={stockValue ?? 0}
+                        onChange={(e) => setStockValue(parseInt(e.target.value))}
+                        onBlur={() => handleStockSave(product.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleStockSave(product.id)
+                        }}
+                        className="w-16 text-right border border-gray-300 rounded px-1 py-0.5"
+                        autoFocus
+                      />
+                    ) : (
+                      product.stock_quantite
+                    )}
+                  </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
