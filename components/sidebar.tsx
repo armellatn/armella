@@ -13,7 +13,8 @@ import {
   Truck,
   Users,
   Barcode,
-  RefreshCcw
+  RefreshCcw,
+  CalendarDays,                // ← nouvelle icône
 } from "lucide-react"
 import { useUser } from "@/lib/UserContext"
 import Image from "next/image"
@@ -27,6 +28,7 @@ export default function Sidebar() {
 
   const [recetteNette, setRecetteNette] = useState<number | null>(null)
 
+  /* ---- Calcul recette nette ---- */
   useEffect(() => {
     if (isAdmin) {
       fetch("/recettes/api")
@@ -38,6 +40,7 @@ export default function Sidebar() {
     }
   }, [isAdmin])
 
+  /* ----------- Navigation ----------- */
   const routes = [
     {
       label: "Tableau de bord",
@@ -67,6 +70,15 @@ export default function Sidebar() {
       color: "text-orange-500",
       show: true,
     },
+    /* ---------- NOUVELLE ENTRÉE ---------- */
+    {
+      label: "Ventes aujourd’hui",
+      icon: CalendarDays,
+      href: "/ventes-aujourdhui",
+      color: "text-orange-400",
+      show: true,      // → mets isAdmin si tu veux restreindre
+    },
+    /* ------------------------------------ */
     {
       label: "Factures",
       icon: FileText,
@@ -103,7 +115,10 @@ export default function Sidebar() {
       show: isAdmin,
     },
     {
-      label: recetteNette !== null ? `Recette du mois: ${recetteNette} DT` : "Recette du mois",
+      label:
+        recetteNette !== null
+          ? `Recette du mois: ${recetteNette} DT`
+          : "Recette du mois",
       icon: CircleDollarSign,
       href: "/recettes",
       color: "text-yellow-600",
@@ -116,22 +131,30 @@ export default function Sidebar() {
       color: "text-red-600",
       show: isAdmin,
     },
-        {
+    {
       label: "Échanges",
       icon: RefreshCcw,
       href: "/echanges",
       color: "text-indigo-600",
-      show: true, 
+      show: true,
+    },
+    {
+      label: "Colissimo",
+      icon: Truck,
+      href: "/colissimo",
+      color: "text-orange-600",
+      show: true,
     },
   ]
 
-  const filteredRoutes = routes.filter((route) => route.show)
+  const filtered = routes.filter(r => r.show)
 
   return (
-    <div className="hidden border-r bg-background md:block md:w-64">
+    <div className="hidden md:block md:w-64 border-r bg-background">
       <div className="flex h-full flex-col">
+        {/* Logo */}
         <div className="border-b px-4 py-4">
-          <Link href="/" className="block relative w-full h-32">
+          <Link href="/" className="relative block h-32 w-full">
             <Image
               src="/armella.png"
               alt="Logo Armelia"
@@ -142,19 +165,22 @@ export default function Sidebar() {
           </Link>
         </div>
 
+        {/* Liens */}
         <div className="flex-1 overflow-auto py-2">
           <nav className="grid items-start px-2 text-sm font-medium">
-            {filteredRoutes.map((route) => (
+            {filtered.map(r => (
               <Link
-                key={route.href}
-                href={route.href}
+                key={r.href}
+                href={r.href}
                 className={cn(
                   "flex items-center gap-3 rounded-lg px-3 py-3 text-muted-foreground transition-all hover:text-primary text-base",
-                  pathname === route.href ? "bg-muted text-primary" : "hover:bg-muted"
+                  pathname === r.href
+                    ? "bg-muted text-primary"
+                    : "hover:bg-muted",
                 )}
               >
-                <route.icon className={cn("h-5 w-5", route.color)} />
-                <span className="truncate">{route.label}</span>
+                <r.icon className={cn("h-5 w-5", r.color)} />
+                <span className="truncate">{r.label}</span>
               </Link>
             ))}
           </nav>
