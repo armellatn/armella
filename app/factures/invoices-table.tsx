@@ -1,130 +1,139 @@
 "use client"
 
-import { useState } from "react"
-import Link from "next/link"
-import { useRouter } from "next/navigation"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Badge } from "@/components/ui/badge"
-import { Eye, Printer, Search, FileDown } from "lucide-react"
-import * as XLSX from "xlsx"
-import jsPDF from "jspdf"
-import autoTable from "jspdf-autotable"
+import { useState }        from "react"
+import { useRouter }       from "next/navigation"
+import Link                from "next/link"
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+}                           from "@/components/ui/table"
+import { Button }          from "@/components/ui/button"
+import { Input }           from "@/components/ui/input"
+import { Badge }           from "@/components/ui/badge"
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+}                           from "@/components/ui/select"
+import { Eye, Printer, Search } from "lucide-react"
+import * as XLSX           from "xlsx"
+import jsPDF               from "jspdf"
+import autoTable           from "jspdf-autotable"
 
-interface Invoice {
-  id: number
-  numero_facture: string
-  date_vente: string
+type SaleType = "boutique" | "colissimo" | "testeur"
+
+export interface Invoice {
+  id:            number
+  numero_facture:string
+  date_vente:    string
   montant_total: number
-  remise: number
-  montant_paye: number
+  remise:        number
+  montant_paye:  number
   methode_paiement: string
-  statut: string
-  client_nom: string
+  statut:        string
+  client_nom:    string
+  type_vente:    SaleType         // ← NOUVEAU
 }
 
-interface InvoicesTableProps {
-  invoices: Invoice[]
-}
-
-export default function InvoicesTable({ invoices }: InvoicesTableProps) {
-  const [searchTerm, setSearchTerm] = useState("")
-  const [startDate, setStartDate] = useState("")
-  const [endDate, setEndDate] = useState("")
+export default function InvoicesTable({ invoices }:{ invoices: Invoice[] }) {
+  const [searchTerm, setSearchTerm]     = useState("")
+  const [startDate,  setStartDate]      = useState("")
+  const [endDate,    setEndDate]        = useState("")
+  const [saleFilter, setSaleFilter]     = useState<SaleType | "all">("all")
   const router = useRouter()
 
-  const filteredInvoices = invoices.filter((invoice) => {
+  /* ---------- helpers ---------- */
+  const fmtPrice = (p: any)   => (isNaN(+p)?0:+p).toFixed(2)
+  const fmtDate  = (d: string)=> new Date(d).toLocaleDateString("fr-FR", {
+                                  day:"2-digit", month:"2-digit", year:"numeric",
+                                  hour:"2-digit", minute:"2-digit"
+                                })
+
+  /* ---------- filtrage ---------- */
+  const filtered = invoices.filter(inv => {
     const matchSearch =
-      invoice.numero_facture.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      invoice.client_nom?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      invoice.methode_paiement.toLowerCase().includes(searchTerm.toLowerCase())
+      inv.numero_facture.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      inv.client_nom?.toLowerCase().includes(searchTerm.toLowerCase())    ||
+      inv.methode_paiement.toLowerCase().includes(searchTerm.toLowerCase())
 
-    const invoiceDate = new Date(invoice.date_vente)
-    const afterStart = !startDate || invoiceDate >= new Date(startDate)
-    const beforeEnd = !endDate || invoiceDate <= new Date(endDate)
-
-    return matchSearch && afterStart && beforeEnd
+    const d = new Date(inv.date_vente)
+    const dateOk = (!startDate || d >= new Date(startDate))
+                && (!endDate   || d <= new Date(endDate))
+    const typeOk = saleFilter === "all" || inv.type_vente === saleFilter
+    return matchSearch && dateOk && typeOk
   })
 
-  const formatPrice = (price: any): string => {
-    const num = typeof price === "number" ? price : parseFloat(price)
-    return isNaN(num) ? "0.00" : num.toFixed(2)
-  }
-
-  const formatDate = (dateStr: string): string => {
-    const date = new Date(dateStr)
-    return date.toLocaleDateString("fr-FR", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
-      hour: "2-digit",
-      minute: "2-digit"
-    })
-  }
-
-  const printInvoice = (id: number) => {
-    router.push(`/factures/${id}/imprimer`)
-  }
-
+  /* ---------- export Excel ---------- */
   const exportExcel = () => {
-    const data = filteredInvoices.map(inv => ({
-      "N° Facture": inv.numero_facture,
-      "Date": formatDate(inv.date_vente),
-      "Client": inv.client_nom,
-      "Méthode": inv.methode_paiement,
-      "Statut": inv.statut,
-      "Montant payé": formatPrice(inv.montant_paye) + " TND"
+    const data = filtered.map(inv => ({
+      "N° Facture" : inv.numero_facture,
+      "Date"       : fmtDate(inv.date_vente),
+      "Client"     : inv.client_nom,
+      "Méthode"    : inv.methode_paiement,
+      "Statut"     : inv.statut,
+      "Type"       : inv.type_vente,
+      "Montant"    : fmtPrice(inv.montant_paye) + " TND",
     }))
     const ws = XLSX.utils.json_to_sheet(data)
     const wb = XLSX.utils.book_new()
     XLSX.utils.book_append_sheet(wb, ws, "Factures")
-    XLSX.writeFile(wb, "factures.xlsx")
+    XLSX.writeFile(wb, `factures_${saleFilter}.xlsx`)
   }
 
-const exportPDF = () => {
-  const doc = new jsPDF()
+  /* ---------- export PDF ---------- */
+  const exportPDF = () => {
+    const doc = new jsPDF()
 
-  const bodyData = filteredInvoices.map(inv => [
-    inv.numero_facture,
-    formatDate(inv.date_vente),
-    inv.client_nom,
-    inv.methode_paiement,
-    inv.statut,
-    formatPrice(inv.montant_paye) + " TND"
-  ])
+    const rows = filtered.map(inv => [
+      inv.numero_facture,
+      fmtDate(inv.date_vente),
+      inv.client_nom,
+      inv.type_vente,
+      inv.methode_paiement,
+      fmtPrice(inv.montant_paye) + " TND",
+    ])
 
-  const totalAmount = filteredInvoices.reduce((sum, inv) => sum + parseFloat(inv.montant_paye.toString()), 0)
-  const totalRow = ["", "", "", "", "Total", formatPrice(totalAmount) + " TND"]
+    const total = filtered.reduce((s, inv) => s + +inv.montant_paye, 0)
+    const totalRow = ["", "", "", "", "Total", fmtPrice(total) + " TND"]
 
-  // Ajouter le tableau
-  autoTable(doc, {
-    head: [["N° Facture", "Date", "Client", "Méthode", "Statut", "Montant"]],
-    body: [...bodyData, totalRow],
-    didDrawCell: (data) => {
-      // Rendre la dernière ligne en gras
-      if (data.row.index === bodyData.length) {
-        doc.setFont("helvetica", "bold")
-      }
-    }
-  })
+    autoTable(doc, {
+      head: [["N°", "Date", "Client", "Type", "Méthode", "Montant"]],
+      body: [...rows, totalRow],
+      didDrawCell: data => {          // gras sur dernière ligne
+        if (data.row.index === rows.length) doc.setFont("helvetica","bold")
+      },
+    })
 
-  doc.save("factures.pdf")
-}
+    doc.save(`factures_${saleFilter}.pdf`)
+  }
 
+  /* ---------- impression d’une facture ---------- */
+  const printOne = (id:number) => router.push(`/factures/${id}/imprimer`)
 
+  /* ---------- UI ---------- */
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2 items-center">
         <Search className="h-4 w-4 text-muted-foreground" />
-        <Input placeholder="Rechercher une facture..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="h-9 w-[200px]" />
-        <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-        <Input type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
-   {/*     <Button onClick={exportExcel} variant="outline">
-          Export Excel <FileDown className="ml-2 h-4 w-4" />
-        </Button> */}
-        <Button onClick={exportPDF} variant="outline">
-          Export PDF <Printer className="ml-2 h-4 w-4" />
+        <Input placeholder="Rechercher…" className="h-9 w-[200px]"
+               value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} />
+
+        <Input type="date" value={startDate} onChange={e=>setStartDate(e.target.value)} />
+        <Input type="date" value={endDate}   onChange={e=>setEndDate(e.target.value)} />
+
+        {/* ---- filtre type de vente ---- */}
+        <Select value={saleFilter} onValueChange={v=>setSaleFilter(v as any)}>
+          <SelectTrigger className="w-[160px]">
+            <SelectValue placeholder="Type" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les types</SelectItem>
+            <SelectItem value="boutique">Boutique</SelectItem>
+            <SelectItem value="colissimo">Colissimo</SelectItem>
+            <SelectItem value="testeur">Testeur</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Button variant="outline" onClick={exportExcel}>Export&nbsp;Excel</Button>
+        <Button variant="outline" onClick={exportPDF}>
+          Export&nbsp;PDF <Printer className="ml-1 h-4 w-4" />
         </Button>
       </div>
 
@@ -132,33 +141,42 @@ const exportPDF = () => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>N° Facture</TableHead>
+              <TableHead>N°</TableHead>
               <TableHead>Date</TableHead>
               <TableHead>Client</TableHead>
+              <TableHead>Type</TableHead>
               <TableHead>Méthode</TableHead>
               <TableHead>Statut</TableHead>
               <TableHead className="text-right">Montant</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
+
           <TableBody>
-            {filteredInvoices.length === 0 ? (
+            {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} className="text-center py-6">Aucune facture trouvée.</TableCell>
+                <TableCell colSpan={8} className="text-center py-6">
+                  Aucune facture.
+                </TableCell>
               </TableRow>
             ) : (
-              filteredInvoices.map((invoice) => (
-                <TableRow key={invoice.id}>
-                  <TableCell>{invoice.numero_facture}</TableCell>
-                  <TableCell>{formatDate(invoice.date_vente)}</TableCell>
-                  <TableCell>{invoice.client_nom || "Client occasionnel"}</TableCell>
-                  <TableCell>{invoice.methode_paiement}</TableCell>
+              filtered.map(inv => (
+                <TableRow key={inv.id}>
+                  <TableCell>{inv.numero_facture}</TableCell>
+                  <TableCell>{fmtDate(inv.date_vente)}</TableCell>
+                  <TableCell>{inv.client_nom || "Occasionnel"}</TableCell>
+                  <TableCell>{inv.type_vente}</TableCell>
+                  <TableCell>{inv.methode_paiement}</TableCell>
                   <TableCell>
-                    <Badge variant={invoice.statut === "payé" ? "success" : "outline"}>{invoice.statut}</Badge>
+                    <Badge variant={inv.statut === "payé" ? "success" : "outline"}>
+                      {inv.statut}
+                    </Badge>
                   </TableCell>
-                  <TableCell className="text-right">{formatPrice(invoice.montant_paye)} TND</TableCell>
                   <TableCell className="text-right">
-                    <Link href={`/factures/${invoice.id}`}>
+                    {fmtPrice(inv.montant_paye)}&nbsp;TND
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Link href={`/factures/${inv.id}`}>
                       <Button variant="ghost" size="icon">
                         <Eye className="h-4 w-4" />
                       </Button>
