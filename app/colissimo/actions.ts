@@ -24,3 +24,21 @@ export async function getColissimoSales() {
   `)
   return rows
 }
+/* …déjà présent… */
+
+export async function getColissimoReturns() {
+  const { rows } = await db.query(`
+    SELECT r.id,
+           r.date_retour,
+           p.nom                         AS produit,
+           r.quantite,
+           r.montant_total::float        AS montant_total,
+           r.notes,
+           r.type_vente
+    FROM   retours r
+           JOIN produits p ON p.id = r.produit_id
+    WHERE  r.type_vente = 'colissimo'
+    ORDER  BY r.date_retour DESC
+  `)
+  return rows
+}
