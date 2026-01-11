@@ -54,8 +54,16 @@ export default function InvoicesTable({ invoices }:{ invoices: Invoice[] }) {
       inv.methode_paiement.toLowerCase().includes(searchTerm.toLowerCase())
 
     const d = new Date(inv.date_vente)
+    
+    // Pour endDate, on ajoute 1 jour pour inclure toute la journée
+    let endDateObj: Date | null = null
+    if (endDate) {
+      endDateObj = new Date(endDate)
+      endDateObj.setDate(endDateObj.getDate() + 1) // Inclure toute la journée de fin
+    }
+    
     const dateOk = (!startDate || d >= new Date(startDate))
-                && (!endDate   || d <= new Date(endDate))
+                && (!endDateObj || d < endDateObj)
     const typeOk = saleFilter === "all" || inv.type_vente === saleFilter
     return matchSearch && dateOk && typeOk
   })

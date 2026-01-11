@@ -171,18 +171,16 @@ export async function createSale(
 /*  Factures (liste + détail) – inchangé, ajouter v.type_vente si besoin */
 /* ------------------------------------------------------------------ */
 
-export async function getInvoices(limit = 50) {
+export async function getInvoices() {
   try {
     const { rows } = await db.query(
       `SELECT v.id, v.numero_facture, v.date_vente, v.montant_total,
               v.remise, v.montant_paye, v.methode_paiement,
-              v.statut, v.type_vente,                            -- nouveau champ
+              v.statut, v.type_vente,
               c.nom || ' ' || c.prenom AS client_nom
        FROM ventes v
        LEFT JOIN clients c ON v.client_id = c.id
-       ORDER BY v.date_vente DESC
-       LIMIT $1`,
-      [limit],
+       ORDER BY v.date_vente DESC`,
     )
     return rows
   } catch (e) {

@@ -234,7 +234,7 @@ export default function POSSystem({
       const res = await createSale(
         selectedClient,
         cart,
-        total,
+        subtotal,  // ← Montant AVANT remise (pas total qui est déjà réduit)
         discount,
         paymentMethod,
         notes,
