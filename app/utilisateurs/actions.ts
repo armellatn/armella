@@ -3,6 +3,7 @@
 import db from "@/lib/db"
 import { revalidatePath } from "next/cache"
 import { createUser } from "../auth/actions"
+import { logAction } from "@/lib/historique"
 
 export type User = {
   id: number
@@ -90,6 +91,14 @@ export async function updateUser(id: number, formData: FormData) {
 
     await db.query(query, values)
 
+    await logAction({
+      typeAction: "UTILISATEUR_MODIFICATION",
+      description: `Utilisateur modifié: ${prenom} ${nom} (${role})`,
+      entiteType: "utilisateur",
+      entiteId: id,
+      donneesApres: { nom, prenom, email, role, actif },
+    })
+
     revalidatePath("/utilisateurs")
     return { success: true }
   } catch (error) {
@@ -114,7 +123,20 @@ export async function deleteUser(id: number) {
       }
     }
 
+    // Get user info before deletion
+    const userResult = await db.query(`SELECT nom, prenom, role FROM utilisateurs WHERE id = $1`, [id])
+    const userInfo = userResult.rows[0]
+
     await db.query(`DELETE FROM utilisateurs WHERE id = $1`, [id])
+
+    await logAction({
+      typeAction: "UTILISATEUR_SUPPRESSION",
+      description: `Utilisateur supprimé: ${userInfo?.prenom || ''} ${userInfo?.nom || ''}`,
+      entiteType: "utilisateur",
+      entiteId: id,
+      donneesAvant: userInfo,
+    })
+
     revalidatePath("/utilisateurs")
     return { success: true }
   } catch (error) {

@@ -32,6 +32,7 @@ export default async function RootLayout({
             <UserProvider
               initialRole={session.userRole}
               userName={session.userName}
+              userId={session.userId}
             >
               <div className="flex h-screen overflow-hidden">
                 <Sidebar />

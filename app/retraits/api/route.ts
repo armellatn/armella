@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import db from '@/lib/db'
+import { logAction } from '@/lib/historique'
 
 export async function GET() {
   try {
@@ -26,10 +27,20 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Champs requis' }, { status: 400 })
     }
 
-    await db.query(
-      `INSERT INTO retraits (montant, description) VALUES ($1, $2)`,
+    const insertResult = await db.query(
+      `INSERT INTO retraits (montant, description) VALUES ($1, $2) RETURNING id`,
       [montant, description]
     )
+
+    const retraitId = insertResult.rows[0].id
+
+    await logAction({
+      typeAction: "RETRAIT_CREATION",
+      description: `Nouveau retrait: ${montant} TND - ${description}`,
+      entiteType: "retrait",
+      entiteId: retraitId,
+      donneesApres: { montant, description },
+    })
 
     const result = await db.query(`
       SELECT id, montant, description, date

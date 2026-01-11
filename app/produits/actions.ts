@@ -2,6 +2,7 @@
 
 import db from "@/lib/db"
 import { revalidatePath } from "next/cache"
+import { logAction } from "@/lib/historique"
 
 /* -------------------------------------------------------------------------- */
 /*                                   Types                                    */
@@ -156,9 +157,25 @@ export async function createProduct(formData: FormData) {
         puissance, diametre, courbure, duree_port, contenu_boite
       ) VALUES (
         $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14
-      )`,
+      ) RETURNING id`,
       values,
     )
+
+    const productId = result.rows[0].id
+
+    await logAction({
+      typeAction: "PRODUIT_CREATION",
+      description: `Nouveau produit créé: ${values[1]} (${values[0]})`,
+      entiteType: "produit",
+      entiteId: productId,
+      donneesApres: {
+        code_produit: values[0],
+        nom: values[1],
+        marque: values[2],
+        prix_vente: values[6],
+        stock_quantite: values[7],
+      },
+    })
 
     revalidatePath("/produits")
     return { success: true }
@@ -218,6 +235,20 @@ export async function updateProduct(id: number, formData: FormData) {
       values,
     )
 
+    await logAction({
+      typeAction: "PRODUIT_MODIFICATION",
+      description: `Produit modifié: ${values[1]} (${values[0]})`,
+      entiteType: "produit",
+      entiteId: id,
+      donneesApres: {
+        code_produit: values[0],
+        nom: values[1],
+        marque: values[2],
+        prix_vente: values[6],
+        stock_quantite: values[7],
+      },
+    })
+
     revalidatePath("/produits")
     return { success: true }
   } catch (error) {
@@ -228,7 +259,20 @@ export async function updateProduct(id: number, formData: FormData) {
 
 export async function deleteProduct(id: number) {
   try {
+    // Get product info before deletion for logging
+    const productResult = await db.query(`SELECT code_produit, nom FROM produits WHERE id = $1`, [id])
+    const productInfo = productResult.rows[0]
+
     await db.query(`DELETE FROM produits WHERE id = $1`, [id])
+
+    await logAction({
+      typeAction: "PRODUIT_SUPPRESSION",
+      description: `Produit supprimé: ${productInfo?.nom || 'Inconnu'} (${productInfo?.code_produit || id})`,
+      entiteType: "produit",
+      entiteId: id,
+      donneesAvant: productInfo,
+    })
+
     revalidatePath("/produits")
     return { success: true }
   } catch (error) {

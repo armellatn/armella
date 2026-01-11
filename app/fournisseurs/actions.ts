@@ -2,6 +2,7 @@
 
 import db from "@/lib/db"
 import { revalidatePath } from "next/cache"
+import { logAction } from "@/lib/historique"
 
 
 
@@ -55,15 +56,25 @@ export async function createFournisseur(formData: FormData) {
   const notes = formData.get("notes") as string
 
   try {
-    await db.query( // CHANGED
+    const result = await db.query(
       `INSERT INTO fournisseurs (
         nom, contact_nom, email, telephone, adresse, ville, 
         code_postal, notes
       ) VALUES (
         $1, $2, $3, $4, $5, $6, $7, $8
-      )`,
+      ) RETURNING id`,
       [nom, contact_nom, email, telephone, adresse, ville, code_postal, notes]
-    ) // CHANGED
+    )
+
+    const fournisseurId = result.rows[0].id
+
+    await logAction({
+      typeAction: "FOURNISSEUR_CREATION",
+      description: `Nouveau fournisseur créé: ${nom}`,
+      entiteType: "fournisseur",
+      entiteId: fournisseurId,
+      donneesApres: { nom, contact_nom, telephone, ville },
+    })
 
     revalidatePath("/fournisseurs")
     return { success: true }
@@ -99,6 +110,14 @@ export async function updateFournisseur(id: number, formData: FormData) {
       [nom, contact_nom, email, telephone, adresse, ville, code_postal, notes, id]
     ) // CHANGED
 
+    await logAction({
+      typeAction: "FOURNISSEUR_MODIFICATION",
+      description: `Fournisseur modifié: ${nom}`,
+      entiteType: "fournisseur",
+      entiteId: id,
+      donneesApres: { nom, contact_nom, telephone, ville },
+    })
+
     revalidatePath("/fournisseurs")
     return { success: true }
   } catch (error) {
@@ -123,7 +142,20 @@ export async function deleteFournisseur(id: number) {
       }
     }
 
+    // Get fournisseur info before deletion
+    const fournisseurResult = await db.query(`SELECT nom FROM fournisseurs WHERE id = $1`, [id])
+    const fournisseurInfo = fournisseurResult.rows[0]
+
     await db.query(`DELETE FROM fournisseurs WHERE id = $1`, [id]) // CHANGED
+
+    await logAction({
+      typeAction: "FOURNISSEUR_SUPPRESSION",
+      description: `Fournisseur supprimé: ${fournisseurInfo?.nom || id}`,
+      entiteType: "fournisseur",
+      entiteId: id,
+      donneesAvant: fournisseurInfo,
+    })
+
     revalidatePath("/fournisseurs")
     return { success: true }
   } catch (error) {

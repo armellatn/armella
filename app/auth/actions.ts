@@ -3,6 +3,7 @@
 import { cookies } from "next/headers"
 import db from "@/lib/db"
 import { redirect } from "next/navigation"
+import { logAction } from "@/lib/historique"
 
 // Fonction pour se connecter avec un code PIN
 export async function loginWithPin(pin: string) {
@@ -46,6 +47,15 @@ export async function loginWithPin(pin: string) {
       path: "/",
     })
 
+    await logAction({
+      typeAction: "CONNEXION",
+      description: `Connexion de ${user.prenom} ${user.nom} (${user.role})`,
+      entiteType: "utilisateur",
+      entiteId: user.id,
+      utilisateurId: user.id,
+      utilisateurNom: `${user.prenom} ${user.nom}`,
+    })
+
     return { success: true }
   } catch (error) {
     console.error("Erreur de connexion:", error)
@@ -55,6 +65,22 @@ export async function loginWithPin(pin: string) {
 
 export async function logout() {
   const cookieStore = await cookies()
+  const sessionCookie = cookieStore.get("session")
+  
+  if (sessionCookie) {
+    try {
+      const session = JSON.parse(sessionCookie.value)
+      await logAction({
+        typeAction: "DECONNEXION",
+        description: `Déconnexion de ${session.userName}`,
+        entiteType: "utilisateur",
+        entiteId: session.userId,
+        utilisateurId: session.userId,
+        utilisateurNom: session.userName,
+      })
+    } catch {}
+  }
+
   cookieStore.delete("session")
   return { success: true }
 }

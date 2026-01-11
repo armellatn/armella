@@ -60,6 +60,7 @@ import {
   type SaleType,
   createSale,
 } from "./actions"
+import { useUser } from "@/lib/UserContext"
 
 /* ---------------------------------------------------------------------
    Props
@@ -84,6 +85,9 @@ export default function POSSystem({
   puissances,
   durees,
 }: POSSystemProps) {
+  /* ----------------------- USER ----------------------- */
+  const { userId, userName } = useUser()
+
   /* ----------------------- STATES ----------------------- */
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("all")
@@ -238,7 +242,9 @@ export default function POSSystem({
         discount,
         paymentMethod,
         notes,
-        saleType, // ←
+        saleType,
+        userId || undefined,
+        userName || undefined,
       )
       if (res.success) {
         setLastTotal(total)

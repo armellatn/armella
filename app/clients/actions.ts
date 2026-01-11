@@ -2,6 +2,7 @@
 
 import db from "@/lib/db"
 import { revalidatePath } from "next/cache"
+import { logAction } from "@/lib/historique"
 
 // const sql = neon(process.env.DATABASE_URL!) // ❌ Supprimé — CHANGED
 
@@ -59,14 +60,14 @@ export async function createClient(formData: FormData) {
   const notes = formData.get("notes") as string
 
   try {
-    await db.query( // CHANGED
+    const result = await db.query(
       `INSERT INTO clients (
         nom, prenom, email, telephone, adresse, ville, 
         code_postal, date_naissance, prescription, notes
       ) VALUES (
         $1, $2, $3, $4, $5, $6,
         $7, $8, $9, $10
-      )`,
+      ) RETURNING id`,
       [
         nom,
         prenom,
@@ -79,7 +80,17 @@ export async function createClient(formData: FormData) {
         prescription,
         notes,
       ]
-    ) // CHANGED
+    )
+
+    const clientId = result.rows[0].id
+
+    await logAction({
+      typeAction: "CLIENT_CREATION",
+      description: `Nouveau client créé: ${nom} ${prenom}`,
+      entiteType: "client",
+      entiteId: clientId,
+      donneesApres: { nom, prenom, telephone, ville },
+    })
 
     revalidatePath("/clients")
     return { success: true }
@@ -131,6 +142,14 @@ export async function updateClient(id: number, formData: FormData) {
       ]
     ) // CHANGED
 
+    await logAction({
+      typeAction: "CLIENT_MODIFICATION",
+      description: `Client modifié: ${nom} ${prenom}`,
+      entiteType: "client",
+      entiteId: id,
+      donneesApres: { nom, prenom, telephone, ville },
+    })
+
     revalidatePath("/clients")
     return { success: true }
   } catch (error) {
@@ -141,7 +160,20 @@ export async function updateClient(id: number, formData: FormData) {
 
 export async function deleteClient(id: number) {
   try {
-    await db.query(`DELETE FROM clients WHERE id = $1`, [id]) // CHANGED
+    // Get client info before deletion
+    const clientResult = await db.query(`SELECT nom, prenom FROM clients WHERE id = $1`, [id])
+    const clientInfo = clientResult.rows[0]
+
+    await db.query(`DELETE FROM clients WHERE id = $1`, [id])
+
+    await logAction({
+      typeAction: "CLIENT_SUPPRESSION",
+      description: `Client supprimé: ${clientInfo?.nom || ''} ${clientInfo?.prenom || ''}`,
+      entiteType: "client",
+      entiteId: id,
+      donneesAvant: clientInfo,
+    })
+
     revalidatePath("/clients")
     return { success: true }
   } catch (error) {

@@ -15,6 +15,9 @@ import {
   Barcode,
   RefreshCcw,
   CalendarDays,                // ← nouvelle icône
+  Settings,
+  Globe,
+  History,
 } from "lucide-react"
 import { useUser } from "@/lib/UserContext"
 import Image from "next/image"
@@ -145,6 +148,28 @@ export default function Sidebar() {
       color: "text-orange-600",
       show: true,
     },
+    {
+      label: "Historique",
+      icon: History,
+      href: "/historique",
+      color: "text-slate-600",
+      show: isAdmin,
+    },
+    // ---- ColissimoAPI Section (hidden for now) ----
+    // {
+    //   label: "ColissimoAPI - Colis",
+    //   icon: Globe,
+    //   href: "/colissimo-api/parcels",
+    //   color: "text-cyan-600",
+    //   show: isAdmin,
+    // },
+    // {
+    //   label: "ColissimoAPI - Paramètres",
+    //   icon: Settings,
+    //   href: "/colissimo-api/settings",
+    //   color: "text-cyan-500",
+    //   show: isAdmin,
+    // },
   ]
 
   const filtered = routes.filter(r => r.show)

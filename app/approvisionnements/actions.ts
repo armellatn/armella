@@ -2,6 +2,7 @@
 
 import db from "@/lib/db"
 import { revalidatePath } from "next/cache"
+import { logAction } from "@/lib/historique"
 
 export type Approvisionnement = {
   id: number
@@ -76,12 +77,29 @@ export async function deleteApprovisionnement(id: number) {
     )
 
     // Supprimer l'approvisionnement principal
+    const approInfo = await client.query(
+      `SELECT a.numero_commande, f.nom as fournisseur_nom, a.montant_total 
+       FROM approvisionnements a 
+       JOIN fournisseurs f ON a.fournisseur_id = f.id 
+       WHERE a.id = $1`,
+      [id]
+    )
+    const info = approInfo.rows[0]
+
     await client.query(
       `DELETE FROM approvisionnements WHERE id = $1`,
       [id]
     )
 
     await client.query("COMMIT")
+
+    await logAction({
+      typeAction: "APPROVISIONNEMENT_SUPPRESSION",
+      description: `Approvisionnement supprimé: ${info?.numero_commande || id} - ${info?.fournisseur_nom || ''}`,
+      entiteType: "approvisionnement",
+      entiteId: id,
+      donneesAvant: info,
+    })
 
     revalidatePath("/approvisionnements")
     revalidatePath("/produits")

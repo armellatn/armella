@@ -6,6 +6,7 @@
 
 import db from "@/lib/db"
 import { revalidatePath } from "next/cache"
+import { logAction } from "@/lib/historique"
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -79,7 +80,7 @@ export async function getClients() {
 }
 
 /* ------------------------------------------------------------------ */
-/*  Création d’une vente                                               */
+/*  Création d'une vente                                               */
 /* ------------------------------------------------------------------ */
 export async function createSale(
   clientId: number | null,
@@ -89,6 +90,8 @@ export async function createSale(
   paymentMethod: string,
   notes: string,
   saleType: SaleType,
+  userId?: number,
+  userName?: string,
 ) {
   const clientValue = clientId ?? null
 
@@ -159,6 +162,24 @@ export async function createSale(
     revalidatePath("/pos")
     revalidatePath("/produits")
     revalidatePath("/factures")
+
+    /* Log de l'action */
+    await logAction({
+      typeAction: "VENTE_CREATION",
+      description: `Nouvelle vente ${invoiceNumber} - ${(total - discount).toFixed(2)} TND (${saleType})`,
+      entiteType: "vente",
+      entiteId: saleId,
+      utilisateurId: userId,
+      utilisateurNom: userName,
+      donneesApres: {
+        numero_facture: invoiceNumber,
+        montant_total: total,
+        remise: discount,
+        montant_paye: total - discount,
+        type_vente: saleType,
+        nb_articles: items.length,
+      },
+    })
 
     return { success: true, invoiceNumber }
   } catch (e) {
