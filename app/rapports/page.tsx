@@ -4,6 +4,8 @@ import { SalesChart } from "@/components/sales-chart"
 import { TopProductsChart } from "@/components/top-products-chart"
 import { getMonthlySalesData, getTopSellingProducts } from "@/lib/data"
 import { getStockStats, getTopStockedProducts } from "@/lib/data"
+import { getDetailedStock, getCategoriesForFilter, getBrandsForFilter } from "./actions"
+import DetailedStockTable from "./detailed-stock-table"
 
 import { TopStockProductsChart } from "@/components/top-stock-products-chart"
 
@@ -13,6 +15,9 @@ export default async function ReportsPage() {
 
 const stockStats = await getStockStats()
 const topStockProducts = await getTopStockedProducts()
+const detailedStock = await getDetailedStock()
+const categoriesForFilter = await getCategoriesForFilter()
+const brandsForFilter = await getBrandsForFilter()
   return (
     <div className="flex flex-col gap-4">
       <div>
@@ -25,6 +30,7 @@ const topStockProducts = await getTopStockedProducts()
           <TabsTrigger value="ventes">Ventes</TabsTrigger>
           <TabsTrigger value="produits">Produits</TabsTrigger>
           <TabsTrigger value="stock">Stock</TabsTrigger>
+          <TabsTrigger value="stock-detail">Stock détaillé</TabsTrigger>
         </TabsList>
 
         <TabsContent value="ventes" className="space-y-4">
@@ -70,6 +76,18 @@ const topStockProducts = await getTopStockedProducts()
     </CardHeader>
     <CardContent className="h-[400px]">
       <TopStockProductsChart data={topStockProducts} />
+    </CardContent>
+  </Card>
+</TabsContent>
+
+<TabsContent value="stock-detail" className="space-y-4">
+  <Card>
+    <CardHeader>
+      <CardTitle>Stock détaillé</CardTitle>
+      <CardDescription>Vue complète de la quantité en stock de chaque produit avec filtres avancés</CardDescription>
+    </CardHeader>
+    <CardContent>
+      <DetailedStockTable stockData={detailedStock} categories={categoriesForFilter} brands={brandsForFilter} />
     </CardContent>
   </Card>
 </TabsContent>
