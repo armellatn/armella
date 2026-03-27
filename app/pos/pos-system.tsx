@@ -194,6 +194,7 @@ export default function POSSystem({
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (scanTimeout) clearTimeout(scanTimeout)
+      if (!e.key) return
       if (e.key.length > 1 && e.key !== "Enter") return
 
       if (e.key === "Enter") {
