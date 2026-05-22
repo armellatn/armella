@@ -41,7 +41,7 @@ async function createSingleReturn(
     `INSERT INTO mouvements_stock (
        produit_id, quantite, type_mouvement,
        reference_id, reference_type, notes
-     ) VALUES ($1,$2,'entrée',$3,'retour',$4)`,
+     ) VALUES ($1,$2,'entree',$3,'retour',$4)`,
     [item.productId, item.quantity, rows[0].id, "Retour Colissimo"],
   )
 }

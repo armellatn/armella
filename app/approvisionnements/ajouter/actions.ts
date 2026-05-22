@@ -74,7 +74,7 @@ export async function createAppro({
     await client.query(
       `INSERT INTO mouvements_stock (
          produit_id, quantite, type_mouvement, reference_id, reference_type, notes
-       ) VALUES ($1, $2, 'entrée', $3, 'approvisionnement', $4)`,
+        ) VALUES ($1, $2, 'entree', $3, 'approvisionnement', $4)`,
       [produitId, quantite, approId, `Appro #${approId}`]
     )
 

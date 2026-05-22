@@ -36,8 +36,8 @@ const brandsForFilter = await getBrandsForFilter()
         <TabsContent value="ventes" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Ventes mensuelles</CardTitle>
-              <CardDescription>Évolution des ventes sur les 12 derniers mois</CardDescription>
+              <CardTitle>Recette nette mensuelle</CardTitle>
+              <CardDescription>Évolution de la recette nette (ventes − retraits − retours − échanges) sur les 12 derniers mois</CardDescription>
             </CardHeader>
             <CardContent className="h-[400px]">
               <SalesChart data={monthlySalesData} />

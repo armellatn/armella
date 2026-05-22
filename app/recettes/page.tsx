@@ -1,7 +1,7 @@
 /* Page Recette du mois – accès direct à PostgreSQL */
 
 import db from "@/lib/db"
-import { BadgeCheck, Undo2, Package } from "lucide-react"
+import { BadgeCheck, Undo2, Package, RefreshCcw } from "lucide-react"
 import { Card, CardContent } from "@/components/ui/card"
 import RecettesTable from "./recettes-table"
 
@@ -9,7 +9,7 @@ export const metadata = { title: "Recette du mois" }
 
 export default async function RecettesPage() {
   /* ---------- Agrégation SQL (mois courant) ---------- */
-  const [ventesRes, retraitsRes, retoursRes, salesDetailsRes] = await Promise.all([
+  const [ventesRes, retraitsRes, retoursRes, echangesRes, salesDetailsRes] = await Promise.all([
     db.query(`
       SELECT COALESCE(SUM(montant_paye), 0)::float AS total
       FROM   ventes
@@ -25,6 +25,11 @@ export default async function RecettesPage() {
       FROM   retours
       WHERE  date_retour >= date_trunc('month', CURRENT_DATE)
     `),
+    db.query(`
+      SELECT COALESCE(SUM(montant_net), 0)::float AS total
+      FROM   echanges
+      WHERE  date_echange >= date_trunc('month', CURRENT_DATE)
+    `).catch(() => ({ rows: [{ total: 0 }] })),
     db.query(`
       SELECT 
         v.id as vente_id,
@@ -53,7 +58,8 @@ export default async function RecettesPage() {
   const ventes   = ventesRes.rows[0].total
   const retraits = retraitsRes.rows[0].total
   const retours  = retoursRes.rows[0].total
-  const net      = ventes - retraits - retours
+  const echanges = echangesRes.rows[0].total
+  const net      = ventes - retraits - retours - echanges
   
   const salesDetails = salesDetailsRes.rows.map((item: any) => ({
     venteId: item.vente_id,
@@ -85,7 +91,7 @@ export default async function RecettesPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
         <Card>
           <CardContent className="p-4">
             <div className="text-sm text-muted-foreground">Total ventes</div>
@@ -104,6 +110,14 @@ export default async function RecettesPage() {
               <Undo2 className="h-3 w-3" /> Total retours
             </div>
             <div className="text-2xl font-bold text-red-600">{retours.toFixed(2)} DT</div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="text-sm text-muted-foreground flex items-center gap-1">
+              <RefreshCcw className="h-3 w-3" /> Échanges / retours
+            </div>
+            <div className="text-2xl font-bold text-indigo-600">{echanges.toFixed(2)} DT</div>
           </CardContent>
         </Card>
         <Card>

@@ -32,7 +32,7 @@ export function SalesChart({ data }: SalesChartProps) {
           tickFormatter={(value) => `${value}TND`}
         />
         <Tooltip
-          formatter={(value: number) => [`${value.toFixed(2)}TND`, "Ventes"]}
+          formatter={(value: number) => [`${value.toFixed(2)} TND`, "Recette nette"]}
           labelFormatter={(label) => `${label}`}
         />
         <Bar dataKey="total" fill="#4f46e5" radius={[4, 4, 0, 0]} />

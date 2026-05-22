@@ -8,30 +8,35 @@ export async function GET() {
     const ventesResult = await db.query(`
       SELECT COALESCE(SUM(montant_paye), 0)::float AS total
       FROM   ventes
-      WHERE  EXTRACT(MONTH FROM date_vente) = EXTRACT(MONTH FROM CURRENT_DATE)
-        AND  EXTRACT(YEAR  FROM date_vente) = EXTRACT(YEAR  FROM CURRENT_DATE)
+      WHERE  date_vente >= date_trunc('month', CURRENT_DATE)
     `)
 
     /* -------------------- Total retraits (du mois courant) ----------------- */
     const retraitsResult = await db.query(`
       SELECT COALESCE(SUM(montant), 0)::float AS total
       FROM   retraits
-      WHERE  EXTRACT(MONTH FROM date) = EXTRACT(MONTH FROM CURRENT_DATE)
-        AND  EXTRACT(YEAR  FROM date) = EXTRACT(YEAR  FROM CURRENT_DATE)
+      WHERE  date >= date_trunc('month', CURRENT_DATE)
     `)
 
     /* -------------------- Total retours produits (du mois courant) --------- */
     const retoursResult = await db.query(`
       SELECT COALESCE(SUM(montant_total), 0)::float AS total
       FROM   retours
-      WHERE  EXTRACT(MONTH FROM date_retour) = EXTRACT(MONTH FROM CURRENT_DATE)
-        AND  EXTRACT(YEAR  FROM date_retour) = EXTRACT(YEAR  FROM CURRENT_DATE)
+      WHERE  date_retour >= date_trunc('month', CURRENT_DATE)
     `)
+
+    /* -------------------- Échanges / retours boutique (net positif) -------- */
+    const echangesResult = await db.query(`
+      SELECT COALESCE(SUM(montant_net), 0)::float AS total
+      FROM   echanges
+      WHERE  date_echange >= date_trunc('month', CURRENT_DATE)
+    `).catch(e => { console.error("API recette echanges:", e.message); return { rows: [{ total: 0 }] } })
 
     return NextResponse.json({
       ventes:   ventesResult.rows[0].total,
       retraits: retraitsResult.rows[0].total,
-      retours:  retoursResult.rows[0].total,   // ← nouveau champ
+      retours:  retoursResult.rows[0].total,
+      echanges: echangesResult.rows[0].total,
     })
   } catch (error: any) {
     console.error("❌ Erreur API recette :", error.message)

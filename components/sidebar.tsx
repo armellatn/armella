@@ -37,7 +37,11 @@ export default function Sidebar() {
       fetch("/recettes/api")
         .then(res => res.json())
         .then(data => {
-          const nette = (data.ventes || 0) - (data.retraits || 0)
+          const nette =
+            (data.ventes   || 0) -
+            (data.retraits || 0) -
+            (data.retours  || 0) -
+            (data.echanges || 0)   // full signed net: positive = money out; negative = extra revenue
           setRecetteNette(nette)
         })
     }
@@ -120,7 +124,7 @@ export default function Sidebar() {
     {
       label:
         recetteNette !== null
-          ? `Recette du mois: ${recetteNette} DT`
+          ? `Nette: ${recetteNette.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} DT`
           : "Recette du mois",
       icon: CircleDollarSign,
       href: "/recettes",
@@ -175,7 +179,7 @@ export default function Sidebar() {
   const filtered = routes.filter(r => r.show)
 
   return (
-    <div className="hidden md:block md:w-64 border-r bg-background">
+    <div className="hidden md:block md:w-72 border-r bg-background">
       <div className="flex h-full flex-col">
         {/* Logo */}
         <div className="border-b px-4 py-4">

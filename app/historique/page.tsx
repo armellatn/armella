@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect, useCallback } from "react"
-import { useSearchParams, useRouter } from "next/navigation"
 import { fetchHistorique, fetchHistoriqueStats } from "./actions"
 import { HistoriqueEntry, ActionType, EntiteType } from "@/lib/historique"
 import {
@@ -109,19 +108,16 @@ const entiteTypeOptions = [
 ]
 
 export default function HistoriquePage() {
-  const router = useRouter()
-  const searchParams = useSearchParams()
-
   const [entries, setEntries] = useState<HistoriqueEntry[]>([])
   const [loading, setLoading] = useState(true)
-  const [page, setPage] = useState(parseInt(searchParams.get("page") || "1", 10))
+  const [page, setPage] = useState(1)
   const [totalPages, setTotalPages] = useState(1)
   const [total, setTotal] = useState(0)
-  const [search, setSearch] = useState(searchParams.get("search") || "")
-  const [searchInput, setSearchInput] = useState(searchParams.get("search") || "")
-  const [entiteType, setEntiteType] = useState(searchParams.get("entite") || "all")
-  const [dateDebut, setDateDebut] = useState(searchParams.get("dateDebut") || "")
-  const [dateFin, setDateFin] = useState(searchParams.get("dateFin") || "")
+  const [search, setSearch] = useState("")
+  const [searchInput, setSearchInput] = useState("")
+  const [entiteType, setEntiteType] = useState("all")
+  const [dateDebut, setDateDebut] = useState("")
+  const [dateFin, setDateFin] = useState("")
   const [stats, setStats] = useState<{
     totalActions: number
     actionsAujourdhui: number
@@ -159,18 +155,6 @@ export default function HistoriquePage() {
   useEffect(() => {
     loadData()
   }, [loadData])
-
-  // Update URL with filters
-  useEffect(() => {
-    const params = new URLSearchParams()
-    if (page > 1) params.set("page", page.toString())
-    if (search) params.set("search", search)
-    if (entiteType !== "all") params.set("entite", entiteType)
-    if (dateDebut) params.set("dateDebut", dateDebut)
-    if (dateFin) params.set("dateFin", dateFin)
-    const queryString = params.toString()
-    router.push(`/historique${queryString ? `?${queryString}` : ""}`, { scroll: false })
-  }, [page, search, entiteType, dateDebut, dateFin, router])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()

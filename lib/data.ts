@@ -116,14 +116,50 @@ export async function getRecentSales() {
 export async function getMonthlySalesData() {
   try {
     const result = await db.query(`
-      SELECT 
-        EXTRACT(MONTH FROM date_vente) as month,
-        EXTRACT(YEAR FROM date_vente) as year,
-        SUM(montant_paye) as total
-      FROM ventes
-      WHERE date_vente >= CURRENT_DATE - INTERVAL '12 months'
-      GROUP BY EXTRACT(MONTH FROM date_vente), EXTRACT(YEAR FROM date_vente)
-      ORDER BY year, month
+      SELECT
+        v.month,
+        v.year,
+        GREATEST(
+          COALESCE(v.ventes, 0)
+          - COALESCE(re.retraits, 0)
+          - COALESCE(ro.retours, 0)
+          - COALESCE(ex.echanges, 0),
+          0
+        ) AS total
+      FROM (
+        SELECT
+          EXTRACT(MONTH FROM date_vente)::int AS month,
+          EXTRACT(YEAR  FROM date_vente)::int AS year,
+          SUM(montant_paye) AS ventes
+        FROM ventes
+        WHERE date_vente >= CURRENT_DATE - INTERVAL '12 months'
+        GROUP BY 1, 2
+      ) v
+      LEFT JOIN (
+        SELECT EXTRACT(MONTH FROM date)::int AS month,
+               EXTRACT(YEAR  FROM date)::int AS year,
+               SUM(montant) AS retraits
+        FROM retraits
+        WHERE date >= CURRENT_DATE - INTERVAL '12 months'
+        GROUP BY 1, 2
+      ) re ON re.month = v.month AND re.year = v.year
+      LEFT JOIN (
+        SELECT EXTRACT(MONTH FROM date_retour)::int AS month,
+               EXTRACT(YEAR  FROM date_retour)::int AS year,
+               SUM(montant_total) AS retours
+        FROM retours
+        WHERE date_retour >= CURRENT_DATE - INTERVAL '12 months'
+        GROUP BY 1, 2
+      ) ro ON ro.month = v.month AND ro.year = v.year
+      LEFT JOIN (
+        SELECT EXTRACT(MONTH FROM date_echange)::int AS month,
+               EXTRACT(YEAR  FROM date_echange)::int AS year,
+               SUM(montant_net) AS echanges
+        FROM echanges
+        WHERE date_echange >= CURRENT_DATE - INTERVAL '12 months'
+        GROUP BY 1, 2
+      ) ex ON ex.month = v.month AND ex.year = v.year
+      ORDER BY v.year, v.month
     `)
 
     const monthNames = ["Jan", "Fév", "Mar", "Avr", "Mai", "Juin", "Juil", "Août", "Sep", "Oct", "Nov", "Déc"]
